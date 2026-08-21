@@ -1,9 +1,21 @@
-import { CTASection } from "@/features/marketing";
+import {
+  CTASection,
+  ContentSection,
+  FAQSection,
+  FeaturesSection,
+  HeroSection,
+  IntegrationsSection,
+} from "@/features/marketing";
 
 export default function Home() {
   return (
-    <div style={{ backgroundColor: "#09090B" }}>
+    <>
+      <HeroSection />
+      <FeaturesSection />
+      <ContentSection />
+      <IntegrationsSection />
+      <FAQSection />
       <CTASection />
-    </div>
+    </>
   );
 }

@@ -2,6 +2,11 @@
 // instead of reaching into internal files (components/constants/types) directly.
 
 export { CTASection } from "./components/cta-section";
+export { HeroSection } from "./components/hero-section";
+export { FeaturesSection } from "./components/features-section";
+export { ContentSection } from "./components/content-section";
+export { IntegrationsSection } from "./components/integrations-section";
+export { FAQSection } from "./components/faq-section";
 
 export * from "./constants/navigation";
 export * from "./types";
