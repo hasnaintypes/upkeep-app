@@ -1,55 +1,40 @@
-import { ThemeSwitcher } from "@/components/layout/theme-switcher";
-import { FOOTER_LINK_GROUPS } from "@/features/marketing";
+import Link from "next/link";
+import { CirclePower } from "lucide-react";
+import { BRAND_NAME, NAV_LINKS } from "@/features/marketing";
 
-export function SiteFooter() {
+async function getCurrentYear() {
+  "use cache";
+  return new Date().getFullYear();
+}
+
+export async function SiteFooter() {
+  const year = await getCurrentYear();
+
   return (
-    <footer className="border-t border-zinc-800 py-16 px-6" style={{ backgroundColor: "#09090B" }}>
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
-          {/* Logo */}
-          <div className="col-span-2 md:col-span-1">
-            <svg width="20" height="20" viewBox="0 0 100 100" fill="none" className="text-white">
-              <path
-                d="M20 30 L50 10 L80 30 L80 70 L50 90 L20 70 Z"
-                fill="currentColor"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <path d="M50 10 L50 50 L20 30" fill="#09090B" />
-              <path d="M50 50 L80 70 L50 90" fill="#09090B" />
-            </svg>
+    <footer className="border-t border-zinc-800 py-12" style={{ backgroundColor: "#09090B" }}>
+      <div className="mx-auto max-w-5xl px-6">
+        <div className="flex flex-wrap items-center justify-between gap-12">
+          <div className="order-last flex items-center gap-3 md:order-first">
+            <Link href="/" aria-label="go home" className="flex items-center gap-2">
+              <CirclePower className="w-5 h-5 text-white" />
+              <span className="text-white font-semibold">{BRAND_NAME}</span>
+            </Link>
+            <span className="text-zinc-500 block text-center text-sm">
+              © {year} {BRAND_NAME}, all rights reserved
+            </span>
           </div>
 
-          {/* Links */}
-          {FOOTER_LINK_GROUPS.map(({ category, links }) => (
-            <div key={category}>
-              <h3 className="text-white font-medium text-sm mb-4">{category}</h3>
-              <ul className="space-y-3">
-                {links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-zinc-500 hover:text-zinc-300 transition-colors text-sm">
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-zinc-800/60 flex items-center justify-between">
-          <p className="text-zinc-600 text-xs">
-            Built with{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="text-zinc-400 hover:text-zinc-300 hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
-          <ThemeSwitcher />
+          <div className="order-first flex flex-wrap items-center gap-x-6 gap-y-4 md:order-last">
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-zinc-400 hover:text-white block text-sm duration-150"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
