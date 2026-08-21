@@ -1,16 +1,16 @@
 "use client";
 
+import { CirclePower } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { BRAND_NAME } from "@/features/marketing";
 import Link from "next/link";
 import { useState } from "react";
 import { resetPasswordForEmail } from "../lib/actions";
@@ -47,60 +47,66 @@ export function ForgotPasswordForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      {success ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Check Your Email</CardTitle>
-            <CardDescription>Password reset instructions sent</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              If you registered using your email and password, you will receive
-              a password reset email.
+      <form onSubmit={handleForgotPassword}>
+        <FieldGroup>
+          <div className="flex flex-col items-center gap-2 text-center">
+            <Link
+              href="/"
+              className="flex flex-col items-center gap-2 font-medium"
+            >
+              <div className="flex size-8 items-center justify-center rounded-md">
+                <CirclePower className="size-6" />
+              </div>
+              <span className="sr-only">{BRAND_NAME}</span>
+            </Link>
+            {success ? (
+              <>
+                <h1 className="text-xl font-bold">Check your email</h1>
+                <FieldDescription>
+                  Password reset instructions sent
+                </FieldDescription>
+              </>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold">Reset your password</h1>
+                <FieldDescription>
+                  Type in your email and we&apos;ll send you a link to reset
+                  your password
+                </FieldDescription>
+              </>
+            )}
+          </div>
+          {success ? (
+            <p className="text-center text-sm text-muted-foreground">
+              If you registered using your email and password, you will
+              receive a password reset email.
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Reset Your Password</CardTitle>
-            <CardDescription>
-              Type in your email and we&apos;ll send you a link to reset your
-              password
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleForgotPassword}>
-              <div className="flex flex-col gap-6">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
+          ) : (
+            <>
+              <Field>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Field>
+                <Button type="submit" disabled={isLoading}>
                   {isLoading ? "Sending..." : "Send reset email"}
                 </Button>
-              </div>
-              <div className="mt-4 text-center text-sm">
-                Already have an account?{" "}
-                <Link
-                  href={AUTH_ROUTES.login}
-                  className="underline underline-offset-4"
-                >
-                  Login
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              </Field>
+            </>
+          )}
+        </FieldGroup>
+      </form>
+      <FieldDescription className="px-6 text-center">
+        Already have an account? <Link href={AUTH_ROUTES.login}>Login</Link>
+      </FieldDescription>
     </div>
   );
 }
