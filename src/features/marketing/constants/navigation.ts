@@ -1,34 +1,33 @@
 import type { FooterLinkGroup, NavLink } from "../types";
 
-export const BRAND_NAME = "Sprint";
+export const BRAND_NAME = "Upkeep";
 
 export const NAV_LINKS: NavLink[] = [
-  { label: "Product", href: "#" },
-  { label: "Resources", href: "#" },
-  { label: "Pricing", href: "#" },
-  { label: "Customers", href: "#" },
-  { label: "Contact", href: "#" },
+  { label: "Features", href: "#" },
+  { label: "How it works", href: "#" },
+  { label: "Self-hosting", href: "#" },
+  { label: "GitHub", href: "#" },
 ];
 
 export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
   {
-    category: "Features",
-    links: ["Plan", "Build", "Insights", "Customer Requests", "Sprint Asks", "Security", "Mobile"],
-  },
-  {
     category: "Product",
-    links: ["Pricing", "Method", "Integrations", "Changelog", "Documentation", "Download", "Switch"],
+    links: ["Dashboard", "Health checks", "Incidents", "Public status pages", "Keep-alive"],
   },
   {
-    category: "Company",
-    links: ["About", "Customers", "Careers", "Now", "README", "Quality", "Brand"],
+    category: "Integrations",
+    links: ["Discord", "Telegram", "Email", "Webhooks", "REST API"],
   },
   {
     category: "Resources",
-    links: ["Developers", "Status", "Startups", "Report vulnerability", "DPA", "Privacy", "Terms"],
+    links: ["Documentation", "Health endpoint spec", "Self-hosting guide", "Changelog"],
+  },
+  {
+    category: "Company",
+    links: ["About", "Open source", "GitHub"],
   },
   {
     category: "Connect",
-    links: ["Contact us", "Community", "X (Twitter)", "GitHub", "YouTube"],
+    links: ["GitHub", "X (Twitter)", "Report an issue"],
   },
 ];

@@ -1,5 +1,5 @@
 export const CTA_CONTENT = {
-  heading: "Plan the present. Build the future.",
-  secondaryCta: "Contact sales",
+  heading: "Stop babysitting host dashboards.",
+  secondaryCta: "View on GitHub",
   primaryCta: "Get started",
 };
