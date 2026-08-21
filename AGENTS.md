@@ -43,3 +43,13 @@ Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 
 - `next.config.ts` sets `cacheComponents: true`. Any dynamic data access (`cookies()`, `supabase.auth.getClaims()`, etc.) must be isolated in its own component wrapped in `<Suspense>`, or `pnpm build` fails with a "blocking prerender" error. Pattern: see `src/app/protected/page.tsx` — the page component itself stays synchronous; a separate `async function AuthGuard()` does the session check and is rendered inside `<Suspense>`.
 - `tsconfig.json` has no path excludes beyond `node_modules`. Any stray Next.js/TS project left in the repo root (e.g. a copied design template) gets type-checked by `pnpm build` and breaks it — keep unrelated scaffolding out of the repo root, or delete it once you've extracted what you need from it.
+
+## Working Conventions
+
+- **Never add a `Co-Authored-By` trailer or "Generated with Claude" footer to commit messages.** Plain, human-style messages only, following Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`) with a short imperative subject.
+- **Act as a software architect.** Before implementing, weigh future scalability (more projects/users/checks), the PRD's Supabase-portability requirement, and fit with the existing feature-based module pattern. Choose the boring, extensible option over a clever one-off.
+- **Don't silently fix unrelated issues.** If you notice a bug, bad convention, or debt outside the current task's scope, stop and tell the user what it is and why it matters instead of patching it inline. The user decides whether it becomes a GitHub issue (see `docs/ROADMAP.md` for phase/issue structure).
+- **Production-grade only.** No dangling TODOs, no swallowed errors, no `any` used to dodge a type error. Handle errors at their actual boundary.
+- **Be token-efficient.** Don't over-narrate, don't re-read files you just edited. For a single non-decomposable task, do the work then verify once (lint/typecheck/build) at the end — don't re-verify after every intermediate edit.
+- **Nothing server-only ever reaches the client.** Only `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are public. Service role keys, API secrets, and notification tokens stay server-only (Server Actions, Route Handlers, Edge Functions) — never pass them into a Client Component, serialize them into HTML, or log them.
+- **Keep `CLAUDE.md`/`AGENTS.md` and `README.md` current.** Architecture, convention, command, or env var changes get documented in the same change that makes them — don't let docs drift.
