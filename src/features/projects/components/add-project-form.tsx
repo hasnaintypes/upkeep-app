@@ -35,6 +35,7 @@ import type { Project } from "../types";
 import type { HeaderMap } from "../lib/headers";
 import {
   diffHeaderRows,
+  getDuplicateHeaderKeys,
   headerRowsFromMasked,
   HeaderFieldsEditor,
   type HeaderRow,
@@ -106,6 +107,11 @@ export function AddProjectForm({
     e.preventDefault();
     setFormError(null);
     setSuccess(false);
+
+    if (getDuplicateHeaderKeys(headerRows).size > 0) {
+      setFormError("Header names must be unique (case-insensitive).");
+      return;
+    }
 
     const tags = values.tagsInput
       .split(",")

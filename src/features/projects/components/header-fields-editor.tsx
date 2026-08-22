@@ -3,7 +3,7 @@
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FieldDescription, FieldLabel } from "@/components/ui/field";
+import { FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import type { HeaderMap } from "../lib/headers";
 
 export type HeaderRow = {
@@ -71,6 +71,27 @@ export function diffHeaderRows(
   return { set, remove };
 }
 
+/**
+ * Header names are case-insensitive per HTTP semantics, so "Authorization"
+ * and "authorization" in the same row set are duplicates too. Returns the
+ * lowercased keys that appear more than once, for both inline row styling
+ * and blocking submit in AddProjectForm.
+ */
+export function getDuplicateHeaderKeys(rows: HeaderRow[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = row.key.trim().toLowerCase();
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const duplicates = new Set<string>();
+  for (const [key, count] of counts) {
+    if (count > 1) duplicates.add(key);
+  }
+  return duplicates;
+}
+
 type HeaderFieldsEditorProps = {
   rows: HeaderRow[];
   onChange: (rows: HeaderRow[]) => void;
@@ -84,6 +105,8 @@ type HeaderFieldsEditorProps = {
  * full.
  */
 export function HeaderFieldsEditor({ rows, onChange }: HeaderFieldsEditorProps) {
+  const duplicates = getDuplicateHeaderKeys(rows);
+
   function updateRow(id: string, patch: Partial<HeaderRow>) {
     onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   }
@@ -103,11 +126,14 @@ export function HeaderFieldsEditor({ rows, onChange }: HeaderFieldsEditorProps) 
         </FieldDescription>
       </div>
 
-      {rows.map((row) => (
+      {rows.map((row) => {
+        const isDuplicate = duplicates.has(row.key.trim().toLowerCase());
+        return (
         <div key={row.id} className="flex items-center gap-2">
           <Input
             placeholder="Header name"
             aria-label="Header name"
+            aria-invalid={isDuplicate}
             className="w-1/3"
             value={row.key}
             disabled={row.masked}
@@ -149,7 +175,14 @@ export function HeaderFieldsEditor({ rows, onChange }: HeaderFieldsEditorProps) 
             <Trash2 className="size-4" />
           </Button>
         </div>
-      ))}
+        );
+      })}
+
+      {duplicates.size > 0 && (
+        <FieldError
+          errors={[{ message: "Header names must be unique (case-insensitive)." }]}
+        />
+      )}
 
       <div className="flex gap-2">
         <Button
