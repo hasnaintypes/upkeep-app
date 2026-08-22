@@ -7,7 +7,12 @@ import type { Tables } from "@/lib/supabase/types";
  */
 export type Project = Tables<"projects">;
 
-/** Common shape returned by the project actions in features/projects/lib/actions.ts */
+/**
+ * Common shape returned by the project actions in features/projects/lib/actions.ts.
+ * `data` carries the mutated row back on success (null on error) so callers --
+ * e.g. the project list view -- can update local state without a full re-fetch.
+ */
 export type ProjectActionResult = {
+  data: Project | null;
   error: string | null;
 };

@@ -36,7 +36,7 @@ export async function createProject(
   input: CreateProjectInput,
 ): Promise<ProjectActionResult> {
   if (!input.name.trim()) {
-    return { error: "Project name is required." };
+    return { data: null, error: "Project name is required." };
   }
 
   // Re-validates the same https/localhost rule the "Add project" form
@@ -46,16 +46,22 @@ export async function createProject(
   const healthUrlResult = healthUrlSchema.safeParse(input.health_url);
   if (!healthUrlResult.success) {
     return {
+      data: null,
       error: healthUrlResult.error.issues[0]?.message ?? "Invalid health check URL.",
     };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("projects")
-    .insert({ ...input, health_url: healthUrlResult.data });
+    .insert({ ...input, health_url: healthUrlResult.data })
+    .select()
+    .single();
 
-  return { error: error?.message ?? null };
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
 }
 
 type UpdateProjectInput = Partial<
@@ -63,40 +69,63 @@ type UpdateProjectInput = Partial<
 >;
 
 /**
- * Updates a project by id. If `id` doesn't exist or isn't owned by the
- * current user, the `projects_update_own` RLS policy silently matches zero
- * rows rather than raising an error -- `count` is checked explicitly so that
- * case is still reported as an error instead of a false "success".
+ * Updates a project by id and returns the updated row (the project list view
+ * uses this to update its local state without a full page reload). If `id`
+ * doesn't exist or isn't owned by the current user, the
+ * `projects_update_own` RLS policy silently excludes it, and `.single()`
+ * turns that into a PGRST116 ("no rows") error instead of a false "success".
  */
 export async function updateProject(
   id: string,
   input: UpdateProjectInput,
 ): Promise<ProjectActionResult> {
   if (input.name !== undefined && !input.name.trim()) {
-    return { error: "Project name cannot be empty." };
+    return { data: null, error: "Project name cannot be empty." };
   }
-  if (input.health_url !== undefined && !input.health_url.trim()) {
-    return { error: "Health check URL cannot be empty." };
+
+  if (input.health_url !== undefined) {
+    const healthUrlResult = healthUrlSchema.safeParse(input.health_url);
+    if (!healthUrlResult.success) {
+      return {
+        data: null,
+        error: healthUrlResult.error.issues[0]?.message ?? "Invalid health check URL.",
+      };
+    }
+    input = { ...input, health_url: healthUrlResult.data };
   }
 
   const supabase = await createClient();
-  const { error, count } = await supabase
+  const { data, error } = await supabase
     .from("projects")
-    .update(input, { count: "exact" })
-    .eq("id", id);
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single();
 
   if (error) {
-    return { error: error.message };
+    if (error.code === "PGRST116") {
+      return { data: null, error: "Project not found." };
+    }
+    return { data: null, error: error.message };
   }
-  if (count === 0) {
-    return { error: "Project not found." };
-  }
-  return { error: null };
+  return { data, error: null };
+}
+
+/**
+ * Pauses or resumes monitoring for a project without deleting its history.
+ * Added alongside `deactivateProject` (#13) because the project list view
+ * needs a two-way toggle, not just one-directional deactivation.
+ */
+export async function setProjectActive(
+  id: string,
+  isActive: boolean,
+): Promise<ProjectActionResult> {
+  return updateProject(id, { is_active: isActive });
 }
 
 /** Pauses monitoring for a project without deleting its history. */
 export async function deactivateProject(id: string): Promise<ProjectActionResult> {
-  return updateProject(id, { is_active: false });
+  return setProjectActive(id, false);
 }
 
 /**
@@ -107,16 +136,18 @@ export async function deactivateProject(id: string): Promise<ProjectActionResult
  */
 export async function deleteProject(id: string): Promise<ProjectActionResult> {
   const supabase = await createClient();
-  const { error, count } = await supabase
+  const { data, error } = await supabase
     .from("projects")
-    .delete({ count: "exact" })
-    .eq("id", id);
+    .delete()
+    .eq("id", id)
+    .select()
+    .single();
 
   if (error) {
-    return { error: error.message };
+    if (error.code === "PGRST116") {
+      return { data: null, error: "Project not found." };
+    }
+    return { data: null, error: error.message };
   }
-  if (count === 0) {
-    return { error: "Project not found." };
-  }
-  return { error: null };
+  return { data, error: null };
 }

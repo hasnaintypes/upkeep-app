@@ -25,19 +25,32 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { createProject } from "../lib/actions";
+import { createProject, updateProject } from "../lib/actions";
 import {
   createProjectFormDefaults,
   createProjectSchema,
   type CreateProjectFormValues,
 } from "../lib/validation";
+import type { Project } from "../types";
 
 type FormState = Omit<CreateProjectFormValues, "tags"> & { tagsInput: string };
 
-const initialState: FormState = {
-  ...createProjectFormDefaults,
-  tagsInput: "",
-};
+function toFormState(project?: Project): FormState {
+  if (!project) {
+    return { ...createProjectFormDefaults, tagsInput: "" };
+  }
+  return {
+    name: project.name,
+    description: project.description ?? "",
+    health_url: project.health_url,
+    method: (project.method as FormState["method"]) ?? "GET",
+    expected_status: project.expected_status,
+    check_interval_seconds: project.check_interval_seconds,
+    timeout_ms: project.timeout_ms,
+    hosting_provider: project.hosting_provider ?? "",
+    tagsInput: (project.tags ?? []).join(", "),
+  };
+}
 
 type FieldErrors = Partial<Record<keyof CreateProjectFormValues, string[]>>;
 
@@ -45,11 +58,24 @@ function toFieldErrorMessages(messages: string[] | undefined) {
   return messages?.map((message) => ({ message }));
 }
 
+type AddProjectFormProps = React.ComponentPropsWithoutRef<"form"> & {
+  /** When provided, the form edits this project instead of creating a new one. */
+  project?: Project;
+  /** Called with the created/updated row after a successful submit. */
+  onSuccess?: (project: Project) => void;
+  /** Renders a Cancel button next to Submit (e.g. when used inside a dialog). */
+  onCancel?: () => void;
+};
+
 export function AddProjectForm({
   className,
+  project,
+  onSuccess,
+  onCancel,
   ...props
-}: React.ComponentPropsWithoutRef<"form">) {
-  const [values, setValues] = useState<FormState>(initialState);
+}: AddProjectFormProps) {
+  const isEditing = !!project;
+  const [values, setValues] = useState<FormState>(() => toFormState(project));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -79,13 +105,22 @@ export function AddProjectForm({
     setIsSubmitting(true);
 
     try {
-      const { error } = await createProject(result.data);
-      if (error) {
-        setFormError(error);
+      const response = isEditing
+        ? await updateProject(project.id, result.data)
+        : await createProject(result.data);
+
+      if (response.error || !response.data) {
+        setFormError(response.error ?? "Something went wrong.");
         return;
       }
-      setSuccess(true);
-      setValues(initialState);
+
+      if (isEditing) {
+        onSuccess?.(response.data);
+      } else {
+        setSuccess(true);
+        setValues(toFormState());
+        onSuccess?.(response.data);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -98,12 +133,14 @@ export function AddProjectForm({
       {...props}
     >
       <FieldGroup>
-        <div>
-          <h1 className="text-xl font-bold">Add project</h1>
-          <FieldDescription>
-            Register a project&apos;s health endpoint to start monitoring it.
-          </FieldDescription>
-        </div>
+        {!isEditing && (
+          <div>
+            <h1 className="text-xl font-bold">Add project</h1>
+            <FieldDescription>
+              Register a project&apos;s health endpoint to start monitoring it.
+            </FieldDescription>
+          </div>
+        )}
 
         <Field data-invalid={!!fieldErrors.name}>
           <FieldLabel htmlFor="name">Name</FieldLabel>
@@ -281,9 +318,23 @@ export function AddProjectForm({
           </p>
         )}
 
-        <Field>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Adding project..." : "Add project"}
+        <Field
+          orientation={onCancel ? "horizontal" : "vertical"}
+          className={onCancel ? "justify-end" : undefined}
+        >
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" disabled={isSubmitting} className={onCancel ? "flex-none" : undefined}>
+            {isSubmitting
+              ? isEditing
+                ? "Saving..."
+                : "Adding project..."
+              : isEditing
+                ? "Save changes"
+                : "Add project"}
           </Button>
         </Field>
       </FieldGroup>
