@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, Github } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // Import the route constant directly (not the "@/features/auth" barrel):
 // the barrel also re-exports the server-only AuthButton, which would leak
@@ -8,51 +8,67 @@ import { Button } from "@/components/ui/button";
 // client components (e.g. the auth forms) elsewhere.
 import { AUTH_ROUTES } from "@/features/auth/constants/routes";
 import { HERO_CONTENT } from "../constants/hero";
+import { GITHUB_URL } from "../constants/navigation";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden" style={{ backgroundColor: "#09090B" }}>
-      <div className="relative py-24 md:py-36">
-        <div className="relative z-10 mx-auto w-full max-w-5xl px-6">
-          <div className="md:w-1/2">
-            <h1 className="max-w-md text-balance text-4xl font-medium text-white md:text-6xl">
-              {HERO_CONTENT.heading}
-            </h1>
-            <p className="my-6 max-w-2xl text-balance text-lg text-zinc-400 md:my-8 md:text-xl">
-              {HERO_CONTENT.description}
-            </p>
+    <section className="overflow-hidden">
+      <div className="relative pt-24 lg:pt-40">
+        <div className="space-y-12 md:space-y-16">
+          <div className="relative mx-auto max-w-7xl px-6">
+            <Link
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex w-fit items-center gap-2 font-medium"
+            >
+              <span>{HERO_CONTENT.announcementPrefix}</span>
+              <span className="text-muted-foreground">
+                {HERO_CONTENT.announcementText}
+              </span>
+              <ArrowRight className="size-3.5" />
+            </Link>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="bg-white text-zinc-900 hover:bg-zinc-100">
-                <Link href={AUTH_ROUTES.signUp}>
-                  <span className="text-nowrap">{HERO_CONTENT.primaryCta}</span>
-                  <ChevronRight className="opacity-50" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="border-zinc-700 bg-transparent text-white hover:bg-zinc-800 hover:text-white"
-              >
-                <Link href="#">
-                  <Github className="opacity-70" />
-                  <span className="text-nowrap">{HERO_CONTENT.secondaryCta}</span>
-                </Link>
-              </Button>
+            <div className="mt-8 grid items-end gap-4 md:grid-cols-2 md:gap-6">
+              <h1 className="text-balance text-5xl font-medium tracking-tight md:text-6xl xl:text-7xl">
+                {HERO_CONTENT.heading}
+              </h1>
+              <div className="mx-auto flex max-w-md flex-col gap-6">
+                <p className="text-muted-foreground text-balance text-lg">
+                  {HERO_CONTENT.description}
+                </p>
+
+                <Button asChild className="w-fit">
+                  <Link href={AUTH_ROUTES.signUp}>{HERO_CONTENT.primaryCta}</Link>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="perspective-near mt-16 translate-x-12 md:absolute md:-right-6 md:bottom-16 md:left-1/2 md:top-32 md:mt-0 md:translate-x-0">
-          <div className="relative h-full before:absolute before:-inset-x-4 before:bottom-7 before:top-0 before:skew-x-6 before:rounded-[calc(var(--radius)+1rem)] before:border before:border-white/5 before:bg-white/5">
-            <div className="relative h-full -translate-y-12 skew-x-6 overflow-hidden rounded-(--radius) border border-white/10 shadow-md shadow-black/40 ring-1 ring-white/5">
+          <div className="mx-auto max-w-7xl max-xl:px-2">
+            <div className="bg-muted md:aspect-5/3 relative aspect-square overflow-hidden rounded-3xl lg:aspect-video">
+              <div className="bg-background min-w-4xl lg:min-w-5xl xl:min-w-7xl ring-foreground/6.5 before:mask-radial-at-top-left before:mask-radial-from-65% before:mask-radial-[100%_60%] before:ring-foreground before:border-foreground/10 absolute left-4 top-4 z-10 rounded-2xl p-2 shadow-lg ring before:absolute before:-inset-px before:z-10 before:size-56 before:rounded-tl-2xl before:border-l before:border-t lg:left-16 lg:top-16">
+                <div
+                  aria-hidden
+                  className="bg-foreground/2 z-1 absolute inset-0 rounded-2xl"
+                />
+                <Image
+                  className="bg-background aspect-15/8 relative rounded-2xl"
+                  src="/images/dashboard.webp"
+                  alt="Upkeep dashboard"
+                  width={2700}
+                  height={1440}
+                  priority
+                />
+              </div>
+
               <Image
-                src="/images/dashboard.webp"
-                alt="Upkeep dashboard"
-                fill
-                priority
-                className="size-full object-cover object-left-top"
+                src="https://images.unsplash.com/photo-1772037440088-2ef162671434?q=80&w=1313&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                alt=""
+                width={1313}
+                height={1000}
+                sizes="(max-width: 768px) 100vw, 1280px"
+                className="size-full rotate-180 rounded-3xl object-cover object-bottom"
               />
             </div>
           </div>
