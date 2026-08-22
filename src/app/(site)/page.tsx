@@ -4,6 +4,7 @@ import {
   FAQSection,
   FeaturesSection,
   HeroSection,
+  HowItWorksSection,
   IntegrationsSection,
 } from "@/features/marketing";
 
@@ -12,6 +13,7 @@ export default function Home() {
     <>
       <HeroSection />
       <FeaturesSection />
+      <HowItWorksSection />
       <ContentSection />
       <IntegrationsSection />
       <FAQSection />
