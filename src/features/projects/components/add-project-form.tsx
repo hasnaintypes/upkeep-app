@@ -58,6 +58,7 @@ function toFormState(project?: Project): FormState {
     check_interval_seconds: project.check_interval_seconds,
     timeout_ms: project.timeout_ms,
     hosting_provider: project.hosting_provider ?? "",
+    collection: project.collection ?? "",
     tagsInput: (project.tags ?? []).join(", "),
   };
 }
@@ -75,6 +76,15 @@ type AddProjectFormProps = React.ComponentPropsWithoutRef<"form"> & {
   onSuccess?: (project: Project) => void;
   /** Renders a Cancel button next to Submit (e.g. when used inside a dialog). */
   onCancel?: () => void;
+  /**
+   * Collection names already used by the caller's other projects, offered as
+   * autocomplete suggestions on the Collection field (via a native
+   * <datalist>) so "Resume Projects" and "resume projects" don't end up as
+   * two different collections by typo. Free text is still accepted -- there's
+   * no dedicated collections table to validate against (see the
+   * add_collection_to_projects_table migration for why).
+   */
+  existingCollections?: string[];
 };
 
 export function AddProjectForm({
@@ -82,6 +92,7 @@ export function AddProjectForm({
   project,
   onSuccess,
   onCancel,
+  existingCollections = [],
   ...props
 }: AddProjectFormProps) {
   const isEditing = !!project;
@@ -153,6 +164,7 @@ export function AddProjectForm({
           check_interval_seconds,
           timeout_ms,
           hosting_provider,
+          collection,
           tags: tagsList,
         } = result.data;
 
@@ -165,6 +177,7 @@ export function AddProjectForm({
           check_interval_seconds,
           timeout_ms,
           hosting_provider,
+          collection,
           tags: tagsList,
         });
         if (mainResult.error || !mainResult.data) {
@@ -371,6 +384,31 @@ export function AddProjectForm({
                     onChange={(e) =>
                       updateField("hosting_provider", e.target.value)
                     }
+                  />
+                </Field>
+
+                <Field
+                  orientation="responsive"
+                  data-invalid={!!fieldErrors.collection}
+                >
+                  <FieldLabel htmlFor="collection">Collection</FieldLabel>
+                  <Input
+                    id="collection"
+                    list="collection-suggestions"
+                    placeholder="Resume Projects"
+                    aria-invalid={!!fieldErrors.collection}
+                    value={values.collection}
+                    onChange={(e) => updateField("collection", e.target.value)}
+                  />
+                  {existingCollections.length > 0 && (
+                    <datalist id="collection-suggestions">
+                      {existingCollections.map((name) => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
+                  )}
+                  <FieldError
+                    errors={toFieldErrorMessages(fieldErrors.collection)}
                   />
                 </Field>
 

@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
-import { AddProjectForm } from "@/features/projects";
+import { AddProjectForm, getProjects } from "@/features/projects";
 
-async function AuthGuard() {
+async function NewProjectFormLoader() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -12,17 +12,25 @@ async function AuthGuard() {
     redirect("/auth/login");
   }
 
-  return null;
+  const { data: projects } = await getProjects();
+  const existingCollections = Array.from(
+    new Set(
+      (projects ?? [])
+        .map((project) => project.collection)
+        .filter((collection): collection is string => !!collection?.trim()),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
+  return <AddProjectForm existingCollections={existingCollections} />;
 }
 
 export default function NewProjectPage() {
   return (
     <div className="flex-1 w-full flex flex-col gap-12">
-      <Suspense>
-        <AuthGuard />
-      </Suspense>
       <div className="w-full max-w-2xl">
-        <AddProjectForm />
+        <Suspense>
+          <NewProjectFormLoader />
+        </Suspense>
       </div>
     </div>
   );

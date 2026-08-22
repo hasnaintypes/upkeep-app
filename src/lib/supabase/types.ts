@@ -225,6 +225,7 @@ export type Database = {
       projects: {
         Row: {
           check_interval_seconds: number
+          collection: string | null
           created_at: string
           description: string | null
           expected_body_match: string | null
@@ -245,6 +246,7 @@ export type Database = {
         }
         Insert: {
           check_interval_seconds?: number
+          collection?: string | null
           created_at?: string
           description?: string | null
           expected_body_match?: string | null
@@ -265,6 +267,7 @@ export type Database = {
         }
         Update: {
           check_interval_seconds?: number
+          collection?: string | null
           created_at?: string
           description?: string | null
           expected_body_match?: string | null

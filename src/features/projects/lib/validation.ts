@@ -76,6 +76,14 @@ export const createProjectSchema = z.object({
     .trim()
     .max(100, "Hosting provider must be 100 characters or fewer.")
     .optional(),
+  // A project belongs to at most one collection ("folder") -- PRD §5.1. See
+  // supabase/migrations/*_add_collection_to_projects_table.sql for why this
+  // is a plain nullable column rather than a dedicated collections table.
+  collection: z
+    .string()
+    .trim()
+    .max(100, "Collection name must be 100 characters or fewer.")
+    .optional(),
   tags: z.array(z.string().trim().min(1)).max(20, "Up to 20 tags.").optional(),
   // Only meaningful on create: once a project exists, header/token changes go
   // through the dedicated updateProjectHeaders action (lib/actions.ts) so
@@ -98,6 +106,7 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   check_interval_seconds: PROJECT_DEFAULTS.checkIntervalSeconds,
   timeout_ms: PROJECT_DEFAULTS.timeoutMs,
   hosting_provider: "",
+  collection: "",
   tags: [],
   headers: {},
 };
