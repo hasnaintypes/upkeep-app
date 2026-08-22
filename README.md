@@ -50,6 +50,26 @@ Copy `.env.example` to `.env.local` and set:
 If left unset, Supabase auth silently no-ops (`hasEnvVars` in `src/lib/utils.ts`) — the app still
 boots and the marketing pages work, but sign in/up and protected routes won't function.
 
+### Database (Supabase CLI)
+
+The schema lives as code in `supabase/migrations/` — never hand-author tables in the Supabase
+dashboard. The CLI is pinned as a `devDependency`, so run it via `pnpm supabase ...` rather than a
+globally installed version, to keep everyone on the same CLI version.
+
+This project targets the hosted Supabase project directly (no local Docker stack):
+
+```bash
+pnpm supabase login                        # stores an access token in the CLI's global config —
+                                            # never in this repo
+pnpm supabase link --project-ref <ref>     # <ref> is the project ref from the Supabase dashboard URL
+pnpm supabase migration new <name>         # create a new migration — the pattern for every schema change
+pnpm supabase db push --dry-run            # preview which migrations would be applied
+pnpm supabase db push                      # apply committed migrations to the linked project
+```
+
+`link` only needs to be run once per machine. No secrets are committed — `login` stores its token
+in the CLI's global config, outside the repo.
+
 ### Before opening a PR
 
 ```bash

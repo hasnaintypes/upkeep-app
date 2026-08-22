@@ -17,6 +17,17 @@ pnpm lint     # eslint
 
 No test suite exists yet.
 
+Database schema is code, not dashboard-authored: `supabase/migrations/` is the source of truth. The Supabase CLI is pinned as a `devDependency` — invoke it via `pnpm supabase ...` (not a global install) so every contributor/CI run uses the same version. This project targets the hosted Supabase project directly (no local Docker stack).
+
+```bash
+pnpm supabase link --project-ref <ref>   # connect to the hosted project (after `pnpm supabase login`)
+pnpm supabase migration new <name>       # create a new migration (pattern for every schema change)
+pnpm supabase db push --dry-run          # preview which migrations would apply
+pnpm supabase db push                    # apply committed migrations to the linked project
+```
+
+No Supabase secrets are ever committed — `supabase login` stores its token in the CLI's global config outside the repo.
+
 ## Architecture
 
 Next.js 15 App Router project using a **feature-based `src/` layout**:

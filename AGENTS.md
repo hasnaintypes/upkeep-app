@@ -17,6 +17,23 @@ No test suite exists yet.
 
 **Run `pnpm lint` before `pnpm build`, or delete `.next/` first.** `eslint.config.mjs` has no ignore patterns, so a stale `.next/` build directory gets linted too and floods the output with hundreds of unrelated errors from bundled/minified JS.
 
+### Database (Supabase CLI)
+
+Schema is code, not dashboard-authored: `supabase/migrations/` is the source of truth. The CLI is
+pinned as a `devDependency` — always invoke it via `pnpm supabase ...`, never a global install, so
+every contributor uses the same version. This project targets the hosted Supabase project directly
+(no local Docker stack).
+
+```bash
+pnpm supabase link --project-ref <ref>   # connect to the hosted project (after `pnpm supabase login`)
+pnpm supabase migration new <name>       # create a new migration (pattern for every schema change)
+pnpm supabase db push --dry-run          # preview which migrations would apply
+pnpm supabase db push                    # apply committed migrations to the linked project
+```
+
+No Supabase secrets are ever committed — `supabase login` stores its token in the CLI's global
+config outside the repo.
+
 ## Architecture
 
 Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).

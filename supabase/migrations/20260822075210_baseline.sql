@@ -1,0 +1,2 @@
+-- Baseline migration: establishes supabase/migrations/ as the schema source of truth.
+-- Intentionally empty -- see docs/ROADMAP.md Phase 1 for the tables that follow.
