@@ -70,6 +70,16 @@ pnpm supabase db push                      # apply committed migrations to the l
 `link` only needs to be run once per machine. No secrets are committed — `login` stores its token
 in the CLI's global config, outside the repo.
 
+After any migration change, regenerate the typed schema so queries stay compile-time checked
+against the real database:
+
+```bash
+pnpm gen:types   # writes src/lib/supabase/types.ts from the linked project's schema
+```
+
+`createClient()` in `src/lib/supabase/client.ts` and `server.ts` are generic over the generated
+`Database` type — commit `types.ts` along with the migration that changed the schema.
+
 ### Before opening a PR
 
 ```bash

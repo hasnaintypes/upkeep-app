@@ -34,6 +34,11 @@ pnpm supabase db push                    # apply committed migrations to the lin
 No Supabase secrets are ever committed — `supabase login` stores its token in the CLI's global
 config outside the repo.
 
+**Regenerate `src/lib/supabase/types.ts` after every migration change**: `pnpm gen:types` (runs
+`supabase gen types typescript --linked`, so it reads from the linked hosted project, not a local
+one). Commit the regenerated file in the same change as the migration. `createClient()` in
+`client.ts`/`server.ts` is generic over the resulting `Database` type — don't hand-edit `types.ts`.
+
 ## Architecture
 
 Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
