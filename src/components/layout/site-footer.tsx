@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CirclePower } from "lucide-react";
 import { BRAND_NAME, NAV_LINKS } from "@/features/marketing";
+import { isExternalUrl } from "@/lib/utils";
 
 async function getCurrentYear() {
   "use cache";
@@ -29,6 +30,8 @@ export async function SiteFooter() {
               <a
                 key={link.label}
                 href={link.href}
+                target={isExternalUrl(link.href) ? "_blank" : undefined}
+                rel={isExternalUrl(link.href) ? "noreferrer" : undefined}
                 className="text-zinc-400 hover:text-white block text-sm duration-150"
               >
                 {link.label}

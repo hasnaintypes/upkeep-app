@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CirclePower, Menu, X } from "lucide-react";
 import { BRAND_NAME, NAV_LINKS } from "@/features/marketing";
-import { cn } from "@/lib/utils";
+import { cn, isExternalUrl } from "@/lib/utils";
 
 export function SiteNav({ authSlot }: { authSlot: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,6 +44,8 @@ export function SiteNav({ authSlot }: { authSlot: ReactNode }) {
                 <a
                   key={link.label}
                   href={link.href}
+                  target={isExternalUrl(link.href) ? "_blank" : undefined}
+                  rel={isExternalUrl(link.href) ? "noreferrer" : undefined}
                   className="text-sm text-zinc-400 hover:text-white transition-colors"
                 >
                   {link.label}
@@ -54,22 +56,30 @@ export function SiteNav({ authSlot }: { authSlot: ReactNode }) {
 
           <div
             className={cn(
-              "w-full flex-col items-start gap-6 border-t border-zinc-800 pt-6 lg:flex lg:w-fit lg:flex-row lg:items-center lg:border-0 lg:pt-0",
-              menuOpen ? "flex" : "hidden",
+              "grid w-full transition-all duration-300 ease-in-out motion-reduce:transition-none lg:flex lg:w-fit lg:items-center",
+              menuOpen
+                ? "grid-rows-[1fr] opacity-100"
+                : "grid-rows-[0fr] opacity-0 lg:opacity-100",
             )}
           >
-            <div className="flex flex-col gap-4 lg:hidden">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="text-sm text-zinc-400 hover:text-white transition-colors"
-                >
-                  {link.label}
-                </a>
-              ))}
+            <div className="overflow-hidden lg:overflow-visible">
+              <div className="flex flex-col items-start gap-6 border-t border-zinc-800 pt-6 lg:flex-row lg:items-center lg:border-0 lg:pt-0">
+                <div className="flex flex-col gap-4 lg:hidden">
+                  {NAV_LINKS.map((link) => (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      target={isExternalUrl(link.href) ? "_blank" : undefined}
+                      rel={isExternalUrl(link.href) ? "noreferrer" : undefined}
+                      className="text-sm text-zinc-400 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+                {authSlot}
+              </div>
             </div>
-            {authSlot}
           </div>
         </div>
       </div>

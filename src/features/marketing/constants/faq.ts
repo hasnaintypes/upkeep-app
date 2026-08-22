@@ -3,8 +3,8 @@ import type { FaqItem } from "../types";
 export const FAQ_CONTENT = {
   heading: "FAQs",
   subheading: "Your questions answered",
-  contactPrefix: "Can't find what you're looking for? Contact our",
-  contactLinkText: "GitHub Discussions",
+  contactPrefix: "Can't find what you're looking for? Open an",
+  contactLinkText: "issue on GitHub",
 };
 
 export const FAQ_ITEMS: FaqItem[] = [

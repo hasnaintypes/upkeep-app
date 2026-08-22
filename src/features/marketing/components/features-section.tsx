@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Calendar1 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Reveal } from "./reveal";
 import {
   CODE_ILLUSTRATION_CONTENT,
   FEATURE_CARDS,
@@ -13,37 +14,42 @@ import {
 
 export function FeaturesSection() {
   return (
-    <section>
+    <section id="features">
       <div className="py-24">
         <div className="mx-auto w-full max-w-5xl px-6">
-          <div>
+          <Reveal>
             <h2 className="text-foreground mt-4 text-4xl font-semibold">
               {FEATURES_CONTENT.heading}
             </h2>
             <p className="text-muted-foreground mb-12 mt-4 text-balance text-lg">
               {FEATURES_CONTENT.description}
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {FEATURE_CARDS.map((card) => (
-              <Card key={card.title} variant="soft" className="p-6">
-                <div className="flex aspect-video items-center justify-center">
-                  {card.illustration === "code" ? (
-                    <CodeIllustration className="w-full" />
-                  ) : (
-                    <ScheduleIllustration className="border" />
-                  )}
-                </div>
-                <div className="text-center">
-                  <h3 className="text-foreground text-xl font-semibold">
-                    {card.title}
-                  </h3>
-                  <p className="text-muted-foreground mt-4 text-balance text-lg">
-                    {card.description}
-                  </p>
-                </div>
-              </Card>
+            {FEATURE_CARDS.map((card, index) => (
+              <Reveal key={card.title} delay={index * 100}>
+                <Card
+                  variant="soft"
+                  className="h-full p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                >
+                  <div className="flex aspect-video items-center justify-center">
+                    {card.illustration === "code" ? (
+                      <CodeIllustration className="w-full" />
+                    ) : (
+                      <ScheduleIllustration className="border" />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-foreground text-xl font-semibold">
+                      {card.title}
+                    </h3>
+                    <p className="text-muted-foreground mt-4 text-balance text-lg">
+                      {card.description}
+                    </p>
+                  </div>
+                </Card>
+              </Reveal>
             ))}
           </div>
         </div>
