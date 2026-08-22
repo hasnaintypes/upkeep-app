@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 import type { ProjectActionResult } from "../types";
+import { healthUrlSchema } from "./validation";
 
 /**
  * Server actions for project CRUD. Each wraps a single Supabase call and
@@ -37,12 +38,22 @@ export async function createProject(
   if (!input.name.trim()) {
     return { error: "Project name is required." };
   }
-  if (!input.health_url.trim()) {
-    return { error: "Health check URL is required." };
+
+  // Re-validates the same https/localhost rule the "Add project" form
+  // applies client-side (src/features/projects/lib/validation.ts), so a
+  // caller that bypasses the form (or a future bulk-import/API route) can't
+  // slip an insecure health_url past it.
+  const healthUrlResult = healthUrlSchema.safeParse(input.health_url);
+  if (!healthUrlResult.success) {
+    return {
+      error: healthUrlResult.error.issues[0]?.message ?? "Invalid health check URL.",
+    };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("projects").insert(input);
+  const { error } = await supabase
+    .from("projects")
+    .insert({ ...input, health_url: healthUrlResult.data });
 
   return { error: error?.message ?? null };
 }
