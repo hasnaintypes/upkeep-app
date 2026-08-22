@@ -6,3 +6,8 @@ import type { Tables } from "@/lib/supabase/types";
  * instead of hand-editing this type.
  */
 export type Project = Tables<"projects">;
+
+/** Common shape returned by the project actions in features/projects/lib/actions.ts */
+export type ProjectActionResult = {
+  error: string | null;
+};
