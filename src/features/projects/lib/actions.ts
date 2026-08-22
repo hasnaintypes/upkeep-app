@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 import type { ProjectActionResult } from "../types";
 import { healthUrlSchema } from "./validation";
+import { type HeaderMap, maskProjectHeaders, mergeHeaders } from "./headers";
 
 /**
  * Server actions for project CRUD. Each wraps a single Supabase call and
@@ -16,6 +17,10 @@ import { healthUrlSchema } from "./validation";
  * by the `projects` table's RLS policies (see
  * supabase/migrations/*_create_projects_table.sql), so there's nothing here
  * that could drift out of sync with those policies.
+ *
+ * Every action below returns `headers` masked (lib/headers.ts) -- raw custom
+ * header / bearer token values are never sent back to the client, including
+ * right after creating or updating them.
  */
 
 type CreateProjectInput = Pick<TablesInsert<"projects">, "name" | "health_url"> &
@@ -61,17 +66,25 @@ export async function createProject(
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: maskProjectHeaders(data), error: null };
 }
 
+// `headers` is deliberately excluded: it's managed exclusively through
+// updateProjectHeaders below, which merges against the *raw* stored value.
+// If this generic action accepted `headers`, a client re-submitting the
+// masked placeholder strings it was shown (e.g. "••••1234") would overwrite
+// the real secret with garbage.
 type UpdateProjectInput = Partial<
-  Omit<TablesUpdate<"projects">, "id" | "user_id" | "created_at" | "updated_at">
+  Omit<
+    TablesUpdate<"projects">,
+    "id" | "user_id" | "created_at" | "updated_at" | "headers"
+  >
 >;
 
 /**
- * Updates a project by id and returns the updated row (the project list view
- * uses this to update its local state without a full page reload). If `id`
- * doesn't exist or isn't owned by the current user, the
+ * Updates a project's non-header fields by id and returns the updated row
+ * (the project list view uses this to update its local state without a full
+ * page reload). If `id` doesn't exist or isn't owned by the current user, the
  * `projects_update_own` RLS policy silently excludes it, and `.single()`
  * turns that into a PGRST116 ("no rows") error instead of a false "success".
  */
@@ -108,7 +121,61 @@ export async function updateProject(
     }
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: maskProjectHeaders(data), error: null };
+}
+
+/**
+ * Adds/changes (`set`) and/or deletes (`remove`) individual custom headers /
+ * bearer tokens on a project, per PRD §5.1 / §8. This is the *only* action
+ * allowed to read a project's raw `headers` value -- it fetches the current
+ * raw value server-side, merges in the caller's changes, writes the result,
+ * and returns it masked. The client never has to (and never can) send back
+ * the full existing header set just to add or remove one entry.
+ */
+export async function updateProjectHeaders(
+  id: string,
+  { set = {}, remove = [] }: { set?: HeaderMap; remove?: string[] },
+): Promise<ProjectActionResult> {
+  for (const key of Object.keys(set)) {
+    if (!key.trim()) {
+      return { data: null, error: "Header name cannot be empty." };
+    }
+    if (!set[key].trim()) {
+      return { data: null, error: `Header "${key}" cannot have an empty value.` };
+    }
+  }
+
+  const supabase = await createClient();
+
+  const { data: current, error: fetchError } = await supabase
+    .from("projects")
+    .select("headers")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) {
+    if (fetchError.code === "PGRST116") {
+      return { data: null, error: "Project not found." };
+    }
+    return { data: null, error: fetchError.message };
+  }
+
+  const merged = mergeHeaders(current.headers, set, remove);
+
+  const { data, error } = await supabase
+    .from("projects")
+    .update({ headers: Object.keys(merged).length > 0 ? merged : null })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return { data: null, error: "Project not found." };
+    }
+    return { data: null, error: error.message };
+  }
+  return { data: maskProjectHeaders(data), error: null };
 }
 
 /**
@@ -149,5 +216,5 @@ export async function deleteProject(id: string): Promise<ProjectActionResult> {
     }
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+  return { data: maskProjectHeaders(data), error: null };
 }

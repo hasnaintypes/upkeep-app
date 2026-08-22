@@ -25,15 +25,24 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { createProject, updateProject } from "../lib/actions";
+import { createProject, updateProject, updateProjectHeaders } from "../lib/actions";
 import {
   createProjectFormDefaults,
   createProjectSchema,
   type CreateProjectFormValues,
 } from "../lib/validation";
 import type { Project } from "../types";
+import type { HeaderMap } from "../lib/headers";
+import {
+  diffHeaderRows,
+  headerRowsFromMasked,
+  HeaderFieldsEditor,
+  type HeaderRow,
+} from "./header-fields-editor";
 
-type FormState = Omit<CreateProjectFormValues, "tags"> & { tagsInput: string };
+type FormState = Omit<CreateProjectFormValues, "tags" | "headers"> & {
+  tagsInput: string;
+};
 
 function toFormState(project?: Project): FormState {
   if (!project) {
@@ -76,6 +85,14 @@ export function AddProjectForm({
 }: AddProjectFormProps) {
   const isEditing = !!project;
   const [values, setValues] = useState<FormState>(() => toFormState(project));
+  const [headerRows, setHeaderRows] = useState<HeaderRow[]>(() =>
+    headerRowsFromMasked((project?.headers as HeaderMap | null) ?? {}),
+  );
+  // Captured once on mount -- the set of header keys the project had when the
+  // form opened, so submit can tell which keys were removed vs. left alone.
+  const [originalHeaderKeys] = useState<string[]>(() =>
+    Object.keys((project?.headers as HeaderMap | null) ?? {}),
+  );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -95,7 +112,22 @@ export function AddProjectForm({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
-    const result = createProjectSchema.safeParse({ ...values, tags });
+    // Headers are only validated/submitted here for create. For edit, they
+    // go through updateProjectHeaders below instead of this schema/action --
+    // see lib/headers.ts for why masked values can't just round-trip here.
+    const headersForCreate = isEditing
+      ? {}
+      : Object.fromEntries(
+          headerRows
+            .filter((row) => row.key.trim() && row.value.trim())
+            .map((row) => [row.key.trim(), row.value]),
+        );
+
+    const result = createProjectSchema.safeParse({
+      ...values,
+      tags,
+      headers: headersForCreate,
+    });
 
     if (!result.success) {
       setFieldErrors(result.error.flatten().fieldErrors);
@@ -105,20 +137,62 @@ export function AddProjectForm({
     setIsSubmitting(true);
 
     try {
-      const response = isEditing
-        ? await updateProject(project.id, result.data)
-        : await createProject(result.data);
-
-      if (response.error || !response.data) {
-        setFormError(response.error ?? "Something went wrong.");
-        return;
-      }
-
       if (isEditing) {
-        onSuccess?.(response.data);
+        const {
+          name,
+          description,
+          health_url,
+          method,
+          expected_status,
+          check_interval_seconds,
+          timeout_ms,
+          hosting_provider,
+          tags: tagsList,
+        } = result.data;
+
+        const mainResult = await updateProject(project.id, {
+          name,
+          description,
+          health_url,
+          method,
+          expected_status,
+          check_interval_seconds,
+          timeout_ms,
+          hosting_provider,
+          tags: tagsList,
+        });
+        if (mainResult.error || !mainResult.data) {
+          setFormError(mainResult.error ?? "Something went wrong.");
+          return;
+        }
+
+        let finalProject = mainResult.data;
+        const { set, remove } = diffHeaderRows(originalHeaderKeys, headerRows);
+        if (Object.keys(set).length > 0 || remove.length > 0) {
+          const headersResult = await updateProjectHeaders(project.id, {
+            set,
+            remove,
+          });
+          if (headersResult.error || !headersResult.data) {
+            setFormError(
+              headersResult.error ??
+                "Saved project details, but failed to save headers.",
+            );
+            return;
+          }
+          finalProject = headersResult.data;
+        }
+
+        onSuccess?.(finalProject);
       } else {
+        const response = await createProject(result.data);
+        if (response.error || !response.data) {
+          setFormError(response.error ?? "Something went wrong.");
+          return;
+        }
         setSuccess(true);
         setValues(toFormState());
+        setHeaderRows([]);
         onSuccess?.(response.data);
       }
     } finally {
@@ -306,6 +380,8 @@ export function AddProjectForm({
                   <FieldDescription>Comma-separated.</FieldDescription>
                   <FieldError errors={toFieldErrorMessages(fieldErrors.tags)} />
                 </Field>
+
+                <HeaderFieldsEditor rows={headerRows} onChange={setHeaderRows} />
               </FieldGroup>
             </AccordionContent>
           </AccordionItem>

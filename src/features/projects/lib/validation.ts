@@ -77,6 +77,13 @@ export const createProjectSchema = z.object({
     .max(100, "Hosting provider must be 100 characters or fewer.")
     .optional(),
   tags: z.array(z.string().trim().min(1)).max(20, "Up to 20 tags.").optional(),
+  // Only meaningful on create: once a project exists, header/token changes go
+  // through the dedicated updateProjectHeaders action (lib/actions.ts) so
+  // existing secret values can be merged server-side instead of round-tripped
+  // through this form. See lib/headers.ts for the masking rationale.
+  headers: z
+    .record(z.string().trim().min(1), z.string().trim().min(1))
+    .optional(),
 });
 
 export type CreateProjectFormValues = z.infer<typeof createProjectSchema>;
@@ -92,4 +99,5 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   timeout_ms: PROJECT_DEFAULTS.timeoutMs,
   hosting_provider: "",
   tags: [],
+  headers: {},
 };
