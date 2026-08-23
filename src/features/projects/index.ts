@@ -2,6 +2,8 @@
 // of reaching into internal files (components/lib/constants/types) directly.
 
 export { AddProjectForm } from "./components/add-project-form";
+export { AddProjectSheet } from "./components/add-project-sheet";
+export { AddProjectTrigger } from "./components/add-project-trigger";
 export { ProjectList } from "./components/project-list";
 export { BulkImportForm } from "./components/bulk-import-form";
 

@@ -77,3 +77,33 @@ export async function getProjectById(id: string): Promise<{
   }
   return { data: maskProjectHeaders(data), error: null };
 }
+
+/**
+ * Distinct, sorted collection names across the current user's projects --
+ * for the "Add project" form's Collection autocomplete, at the call sites
+ * that don't already have a full project list in memory (the sidebar's
+ * quick-add button, the dashboard/projects-page headers -- see
+ * `AddProjectTrigger`). Deliberately selects only the `collection` column,
+ * not `select("*")` -- this is called from places that need nothing else
+ * about the projects, including the dashboard layout on every page load.
+ */
+export async function getExistingCollections(): Promise<{
+  data: string[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("collection")
+    .not("collection", "is", null);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  const unique = Array.from(
+    new Set(data.map((row) => row.collection).filter((c): c is string => !!c?.trim())),
+  ).sort((a, b) => a.localeCompare(b));
+
+  return { data: unique, error: null };
+}

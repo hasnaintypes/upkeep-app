@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Power, PowerOff, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AddProjectForm } from "./add-project-form";
+import { AddProjectSheet } from "./add-project-sheet";
 import { deleteProject, setProjectActive } from "../lib/actions";
 import { runProjectCheckNow } from "../lib/run-check";
 import type { ManualCheckResult, Project } from "../types";
@@ -78,6 +79,14 @@ export function ProjectList({
   initialProjects: Project[];
 }) {
   const [projects, setProjects] = useState(initialProjects);
+
+  // Keep local state in sync when the server-fetched list changes underneath
+  // us (e.g. `router.refresh()` after creating a project from a sheet that
+  // isn't this component, such as the sidebar or page-header trigger).
+  useEffect(() => {
+    setProjects(initialProjects);
+  }, [initialProjects]);
+
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -188,9 +197,11 @@ export function ProjectList({
         <CardDescription>
           Add your first project to start monitoring its health endpoint.
         </CardDescription>
-        <Button asChild>
-          <Link href="/dashboard/projects/new">Add project</Link>
-        </Button>
+        <AddProjectSheet
+          trigger={<Button>Add project</Button>}
+          existingCollections={existingCollections}
+          onSuccess={(created) => setProjects((prev) => [created, ...prev])}
+        />
       </Card>
     );
   }

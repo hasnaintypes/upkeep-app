@@ -1,8 +1,15 @@
 import { Suspense } from "react";
+import { PlusCircleIcon } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SidebarInset,
+  SidebarMenuButton,
+  SidebarMenuSkeleton,
+  SidebarProvider,
+} from "@/components/ui/sidebar";
+import { AddProjectTrigger } from "@/features/projects";
 import { AppSidebar, DashboardHeader, NavUser } from "@/features/dashboard";
 
 /**
@@ -49,6 +56,21 @@ export default function DashboardLayout({
           userSlot={
             <Suspense fallback={null}>
               <NavUserLoader />
+            </Suspense>
+          }
+          addProjectSlot={
+            <Suspense fallback={<SidebarMenuSkeleton showIcon />}>
+              <AddProjectTrigger
+                trigger={
+                  <SidebarMenuButton
+                    tooltip="Add project"
+                    className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                  >
+                    <PlusCircleIcon />
+                    <span>Add project</span>
+                  </SidebarMenuButton>
+                }
+              />
             </Suspense>
           }
         />

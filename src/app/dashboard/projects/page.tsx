@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { getProjects, ProjectList } from "@/features/projects";
+import { AddProjectTrigger, getProjects, ProjectList } from "@/features/projects";
 
 async function ProjectsLoader() {
   const supabase = await createClient();
@@ -41,9 +41,9 @@ export default function ProjectsPage() {
           <Button variant="outline" asChild>
             <Link href="/dashboard/projects/import">Import</Link>
           </Button>
-          <Button asChild>
-            <Link href="/dashboard/projects/new">Add project</Link>
-          </Button>
+          <Suspense fallback={<Button disabled>Add project</Button>}>
+            <AddProjectTrigger trigger={<Button>Add project</Button>} />
+          </Suspense>
         </div>
       </div>
       <Suspense

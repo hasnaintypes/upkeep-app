@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getActiveProjects } from "@/features/projects";
+import { AddProjectTrigger, getActiveProjects } from "@/features/projects";
 import { getProjectUptimeSummaries, OverviewTable } from "@/features/dashboard";
 
 /**
@@ -54,9 +53,9 @@ async function OverviewLoader() {
         <CardDescription>
           Add a project and activate it to see its status here.
         </CardDescription>
-        <Button asChild>
-          <Link href="/dashboard/projects/new">Add project</Link>
-        </Button>
+        <Suspense fallback={<Button disabled>Add project</Button>}>
+          <AddProjectTrigger trigger={<Button>Add project</Button>} />
+        </Suspense>
       </Card>
     );
   }

@@ -229,7 +229,7 @@ export function AddProjectForm({
       {...props}
     >
       <FieldGroup>
-        {!isEditing && (
+        {!isEditing && !onCancel && (
           <div>
             <h1 className="text-xl font-bold">Add project</h1>
             <FieldDescription>

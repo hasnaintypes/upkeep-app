@@ -30,19 +30,24 @@ const NAV_MAIN_ITEMS: NavMainItem[] = [
  * app has no documents library or settings/help pages yet, so those
  * sections would be dead links.
  *
- * `userSlot` -- not a fetched-here `user` prop -- because this is a Client
- * Component (the sidebar's collapse/open state needs `SidebarProvider`
- * context) and fetching the signed-in user's email is a dynamic,
- * server-only Supabase call. Same `authSlot`-style composition already
- * used by `SiteNav`/`SiteHeader` (components/layout/): the dashboard
- * layout (a Server Component) fetches the user server-side and passes the
- * rendered result down as a slot, rather than this component reaching for
- * Supabase itself.
+ * `userSlot`/`addProjectSlot` -- not fetched-here props -- because this is
+ * a Client Component (the sidebar's collapse/open state needs
+ * `SidebarProvider` context) and both the signed-in user's email and the
+ * "Add project" trigger's `existingCollections` autocomplete data require
+ * dynamic, server-only Supabase calls. Same `authSlot`-style composition
+ * already used by `SiteNav`/`SiteHeader` (components/layout/): the
+ * dashboard layout (a Server Component) fetches server-side and passes the
+ * rendered result down as a slot, rather than this component (or `NavMain`)
+ * reaching into Supabase or the projects feature itself.
  */
 export function AppSidebar({
   userSlot,
+  addProjectSlot,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { userSlot: ReactNode }) {
+}: React.ComponentProps<typeof Sidebar> & {
+  userSlot: ReactNode;
+  addProjectSlot: ReactNode;
+}) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -58,7 +63,7 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={NAV_MAIN_ITEMS} />
+        <NavMain items={NAV_MAIN_ITEMS} addProjectSlot={addProjectSlot} />
       </SidebarContent>
       <SidebarFooter>{userSlot}</SidebarFooter>
     </Sidebar>
