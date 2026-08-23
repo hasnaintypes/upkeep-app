@@ -183,6 +183,24 @@ export type Database = {
         }
         Relationships: []
       }
+      prober_lock: {
+        Row: {
+          id: boolean
+          is_running: boolean
+          started_at: string | null
+        }
+        Insert: {
+          id?: boolean
+          is_running?: boolean
+          started_at?: string | null
+        }
+        Update: {
+          id?: boolean
+          is_running?: boolean
+          started_at?: string | null
+        }
+        Relationships: []
+      }
       project_notification_rules: {
         Row: {
           channel_id: string
@@ -326,6 +344,11 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      release_prober_lock: { Args: never; Returns: undefined }
+      try_acquire_prober_lock: {
+        Args: { stale_after_seconds?: number }
+        Returns: boolean
       }
     }
     Enums: {

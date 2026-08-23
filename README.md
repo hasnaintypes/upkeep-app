@@ -106,12 +106,27 @@ pnpm supabase functions deploy <name> --use-api     # deploys to the linked proj
 ```
 
 Functions use the `withSupabase` helper from `@supabase/server` for auth. Manually invoking a
-deployed function (for testing, or before the cron trigger that calls it automatically exists)
-needs a **secret key** from the dashboard (Settings → API Keys → Secret keys) sent on the `apikey`
-header — the legacy `service_role` key won't pass `auth: "secret"` checks.
+deployed function needs a **secret key** from the dashboard (Settings → API Keys → Secret keys)
+sent on the `apikey` header — the legacy `service_role` key won't pass `auth: "secret"` checks.
 
 To verify a new SQL function/query without a local Postgres instance, run it directly against the
 linked database: `pnpm supabase db query --linked "<sql>"`.
+
+#### Prober cron trigger
+
+The `prober` function is invoked automatically every minute by a `pg_cron` job (see the
+`schedule_prober_cron` migration) — this is committed as code and requires no dashboard setup.
+The one thing that *can't* be committed is the secret value the job authenticates with. After
+`db push`, run once (`pnpm supabase db query --linked --file <path>` or the SQL editor):
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+select vault.create_secret('<your SUPABASE_SECRET_KEY value>', 'prober_secret_key');
+```
+
+Until both secrets exist, the cron job runs every minute but fails harmlessly (visible in
+`select * from cron.job_run_details order by start_time desc limit 5;`) since it can't build a
+valid request URL/header. No projects are checked until this one-time setup is done.
 
 ### Before opening a PR
 
