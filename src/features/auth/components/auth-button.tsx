@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "./logout-button";
-import { AUTH_ROUTES } from "../constants/routes";
+import { AUTH_ROUTES, DEFAULT_AUTHENTICATED_REDIRECT } from "../constants/routes";
 
 export async function AuthButton() {
   const supabase = await createClient();
@@ -15,6 +15,9 @@ export async function AuthButton() {
   return user ? (
     <div className="flex items-center gap-4">
       Hey, {user.email}!
+      <Button asChild size="sm" variant="outline">
+        <Link href={DEFAULT_AUTHENTICATED_REDIRECT}>Dashboard</Link>
+      </Button>
       <LogoutButton />
     </div>
   ) : (
