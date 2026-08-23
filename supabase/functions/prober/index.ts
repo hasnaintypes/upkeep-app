@@ -1,11 +1,13 @@
-// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#21).
+// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#23).
 //
 // Loads due projects (#20, public.get_due_projects() -- a single indexed
-// query, not N+1) and fires each one's HTTP health check concurrently
-// (#21, check.ts). Deliberately does NOT yet: classify status, retry, or
-// write results to the `checks` table -- those are separate, later Phase 3
-// tasks per docs/ROADMAP.md. For now the raw per-project results are
-// returned directly in the response so this stays independently testable.
+// query, not N+1) and fires each one's HTTP health check concurrently,
+// retrying per the project's own retry_count before finalizing a failure
+// (#21-#23, check.ts / retry.ts). Deliberately does NOT yet: classify
+// status (up/down/degraded/waking/unknown) or write results to the `checks`
+// table -- those are separate, later Phase 3 tasks per docs/ROADMAP.md. For
+// now the raw per-project results are returned directly in the response so
+// this stays independently testable.
 //
 // Auth: service-to-service only. Cron/Scheduled Trigger invocations (wired
 // up in a later issue) and manual testing both authenticate with a secret
@@ -19,7 +21,8 @@
 // outgoing health-check request. The masking from #16 is an
 // application-layer (dashboard) concern, not a database-layer one.
 import { withSupabase } from "@supabase/server";
-import { runHealthChecks, type DueProject } from "./check.ts";
+import type { DueProject } from "./check.ts";
+import { runHealthChecksWithRetry } from "./retry.ts";
 
 const prober = {
   fetch: withSupabase({ auth: "secret" }, async (_req, ctx) => {
@@ -31,7 +34,7 @@ const prober = {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    const results = await runHealthChecks(
+    const results = await runHealthChecksWithRetry(
       (dueProjects ?? []) as unknown as DueProject[],
     );
 

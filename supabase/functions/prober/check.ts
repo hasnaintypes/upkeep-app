@@ -24,6 +24,8 @@ export type DueProject = {
   headers: unknown;
   timeout_ms: number;
   body: string | null;
+  retry_count: number;
+  expected_status: number;
 };
 
 export type CheckResult = {
@@ -37,6 +39,10 @@ export type CheckResult = {
    * step can react to "timed out" without parsing error_message text. Never
    * true alongside a successful response. */
   timed_out: boolean;
+  /** How many attempts this result represents. Always 1 from runHealthCheck
+   * itself (a single attempt); retry.ts overwrites this on the final result
+   * it returns so callers can see whether a retry was needed (#23). */
+  attempts: number;
 };
 
 /** Matches the `checks.response_snippet` column's intended use (PRD §6) --
@@ -93,6 +99,7 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
       response_snippet: bodyText.slice(0, RESPONSE_SNIPPET_MAX_LENGTH) || null,
       error_message: null,
       timed_out: false,
+      attempts: 1,
     };
   } catch (err) {
     const responseTimeMs = Math.round(performance.now() - startedAt);
@@ -113,6 +120,7 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
           ? err.message
           : "Unknown error",
       timed_out: isTimeout,
+      attempts: 1,
     };
   } finally {
     clearTimeout(timeoutId);
@@ -144,6 +152,7 @@ export async function runHealthChecks(
               ? result.reason.message
               : "Unknown error",
           timed_out: false,
+          attempts: 1,
         },
   );
 }
