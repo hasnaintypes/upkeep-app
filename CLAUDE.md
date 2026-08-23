@@ -32,7 +32,7 @@ No Supabase secrets are ever committed — `supabase login` stores its token in 
 
 Next.js 15 App Router project using a **feature-based `src/` layout**:
 
-- `src/app/` — routes only (pages, layouts, route handlers). Auth routes live under `src/app/auth/*`; a `src/app/protected/` route group requires an authenticated session.
+- `src/app/` — routes only (pages, layouts, route handlers). Auth routes live under `src/app/auth/*`; a `src/app/dashboard/` route group requires an authenticated session.
 - `src/features/<feature>/` — self-contained feature modules (currently `auth` and `marketing`), each internally split into `components/`, `lib/`, `constants/`, `types/`. Every feature exposes a single `index.ts` barrel as its public API — import from `@/features/auth`, not from internal paths like `@/features/auth/components/login-form`. Follow this pattern for new features.
 - `src/components/` — cross-feature UI: `components/ui/*` is shadcn/ui primitives (managed via `components.json`, style "new-york"), `components/layout/*` is app chrome (header/footer/theme switcher).
 - `src/lib/supabase/` — three separate Supabase client constructors, each for a different execution context: `client.ts` (browser), `server.ts` (Server Components/Actions, cookie-based), `proxy.ts` (middleware session refresh, used by `src/proxy.ts`). Don't reuse one across contexts — Supabase SSR requires the right client per context, and instances must not be cached in module-level globals (see comments in those files re: Fluid Compute).

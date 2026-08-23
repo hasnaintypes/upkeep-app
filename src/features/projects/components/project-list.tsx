@@ -189,7 +189,7 @@ export function ProjectList({
           Add your first project to start monitoring its health endpoint.
         </CardDescription>
         <Button asChild>
-          <Link href="/protected/projects/new">Add project</Link>
+          <Link href="/dashboard/projects/new">Add project</Link>
         </Button>
       </Card>
     );

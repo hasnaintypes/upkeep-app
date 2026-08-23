@@ -82,7 +82,7 @@ invoke `auth: "secret"` functions, e.g. the "run check now" Server Action
 
 Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 
-- `src/app/` — routes only (pages, layouts, route handlers). `src/app/auth/*` are auth pages; `src/app/protected/*` requires a session (enforced by `src/proxy.ts`).
+- `src/app/` — routes only (pages, layouts, route handlers). `src/app/auth/*` are auth pages; `src/app/dashboard/*` requires a session (enforced by `src/proxy.ts`).
 - `src/features/<name>/` — self-contained modules (currently `auth`, `marketing`), each split into `components/`, `lib/`, `constants/`, `types/`, with a single `index.ts` barrel as its public API. Import via `@/features/auth`, never reach into internal paths like `@/features/auth/components/login-form`. Follow this pattern for new features; only add `lib`/`hooks`/`constants` subfolders when there's real content for them.
 - `src/components/ui/*` — shadcn/ui primitives (style "new-york", managed via `components.json`, add new ones with the shadcn CLI). `src/components/layout/*` — cross-feature app chrome (header/footer/theme switcher) only; feature-specific UI belongs in its feature folder, not here.
 - `src/lib/supabase/` — four separate client constructors for four different execution contexts: `client.ts` (browser), `server.ts` (Server Components/Actions, cookie-based, RLS as the signed-in user), `proxy.ts` (middleware session refresh), `service.ts` (service-role, bypasses RLS entirely — `import "server-only"` guarded, only for trusted server code with no user session, e.g. `POST /api/projects/register`). Don't reuse one across contexts, and don't cache instances in module-level globals (Fluid Compute — see comments in those files).
@@ -103,7 +103,7 @@ Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 
 ## Gotchas
 
-- `next.config.ts` sets `cacheComponents: true`. Any dynamic data access (`cookies()`, `supabase.auth.getClaims()`, etc.) must be isolated in its own component wrapped in `<Suspense>`, or `pnpm build` fails with a "blocking prerender" error. Pattern: see `src/app/protected/page.tsx` — the page component itself stays synchronous; a separate `async function AuthGuard()` does the session check and is rendered inside `<Suspense>`.
+- `next.config.ts` sets `cacheComponents: true`. Any dynamic data access (`cookies()`, `supabase.auth.getClaims()`, etc.) must be isolated in its own component wrapped in `<Suspense>`, or `pnpm build` fails with a "blocking prerender" error. Pattern: see `src/app/dashboard/page.tsx` — the page component itself stays synchronous; a separate `async function AuthGuard()` does the session check and is rendered inside `<Suspense>`.
 - `tsconfig.json` excludes only `node_modules` and `supabase/functions`. Any stray Next.js/TS project left in the repo root (e.g. a copied design template) still gets type-checked by `pnpm build` and breaks it — keep unrelated scaffolding out of the repo root, or delete it once you've extracted what you need from it.
 - `supabase/functions/**` is Deno, not Node — it has its own `deno.json` import map per function and is excluded from the root `tsconfig.json` (added when the first function was created) specifically because `next build`'s type-checker can't resolve Deno-style specifiers like `@supabase/server`. If you ever see `next build` failing on a `supabase/functions/*.ts` file with "Cannot find module," the exclude is missing, not the package.
 

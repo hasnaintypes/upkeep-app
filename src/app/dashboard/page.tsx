@@ -15,7 +15,7 @@ async function AuthGuard() {
   return null;
 }
 
-export default function ProtectedPage() {
+export default function DashboardPage() {
   return (
     <div className="flex-1 w-full flex flex-col gap-12">
       <Suspense>

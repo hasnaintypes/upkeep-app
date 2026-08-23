@@ -39,10 +39,10 @@ export default function ProjectsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href="/protected/projects/import">Import</Link>
+            <Link href="/dashboard/projects/import">Import</Link>
           </Button>
           <Button asChild>
-            <Link href="/protected/projects/new">Add project</Link>
+            <Link href="/dashboard/projects/new">Add project</Link>
           </Button>
         </div>
       </div>
