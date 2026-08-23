@@ -7,19 +7,21 @@ import { createClient } from "@/lib/supabase/server";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProjectById } from "@/features/projects";
 import {
+  getProjectDailyHistory,
   getProjectUptimeSummaries,
   getResponseTimeSeries,
   ResponseTimeSection,
   StatusBadge,
+  UptimeHeatmap,
   UPTIME_WINDOWS,
 } from "@/features/dashboard";
 import type { ResponseTimeSeries, UptimeWindowKey } from "@/features/dashboard";
 
 /**
- * Per-project detail page (PRD §5.6, Phase 4). Currently just the
- * response-time graph section (#30); the uptime heatmap/timeline (#31) and
- * raw check log (#32) are separate, later Phase 4 issues that will add
- * more sections to this same page.
+ * Per-project detail page (PRD §5.6, Phase 4). Response-time graph (#30)
+ * and uptime heatmap/timeline (#31) so far; the raw check log (#32) is a
+ * separate, later Phase 4 issue that will add one more section to this
+ * same page.
  */
 async function ProjectDetailLoader({
   params,
@@ -48,12 +50,15 @@ async function ProjectDetailLoader({
 
   const summary = summaries?.find((s) => s.project_id === project.id) ?? null;
 
-  const seriesEntries = await Promise.all(
-    UPTIME_WINDOWS.map(async (w) => {
-      const { data } = await getResponseTimeSeries(project.id, w.key);
-      return [w.key, data] as const;
-    }),
-  );
+  const [seriesEntries, { data: dailyHistory, error: historyError }] = await Promise.all([
+    Promise.all(
+      UPTIME_WINDOWS.map(async (w) => {
+        const { data } = await getResponseTimeSeries(project.id, w.key);
+        return [w.key, data] as const;
+      }),
+    ),
+    getProjectDailyHistory(project.id),
+  ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
     UptimeWindowKey,
     ResponseTimeSeries
@@ -82,6 +87,14 @@ async function ProjectDetailLoader({
       </div>
 
       <ResponseTimeSection seriesByWindow={seriesByWindow} />
+
+      {historyError ? (
+        <p className="text-sm text-destructive">
+          Failed to load uptime history: {historyError}
+        </p>
+      ) : (
+        <UptimeHeatmap history={dailyHistory ?? []} />
+      )}
     </div>
   );
 }

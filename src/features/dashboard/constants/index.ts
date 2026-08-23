@@ -41,3 +41,27 @@ export const UPTIME_WINDOWS: { key: UptimeWindowKey; label: string }[] = [
   { key: "30d", label: "30d" },
   { key: "90d", label: "90d" },
 ];
+
+/**
+ * Uptime-% thresholds for the heatmap/timeline's per-day cell color (PRD
+ * §5.6, Phase 4, #31) -- status-page.io-style: a day only reads as fully
+ * "healthy" at 100% (any failure at all still shows, if faintly), a
+ * partial-outage day is amber, and a day below `DEGRADED_DAY_THRESHOLD`
+ * uptime is red. Distinct from `classify.ts`'s per-*check*
+ * degraded/waking thresholds (response-time based) -- this is a per-*day*
+ * aggregate uptime-percentage bucketing, a different axis entirely.
+ */
+export const DEGRADED_DAY_THRESHOLD = 99.9;
+export const DOWN_DAY_THRESHOLD = 95;
+
+/** Tailwind color classes for each heatmap cell bucket. Direct palette
+ * colors (not this project's neutral OKLCH theme tokens) -- a status
+ * timeline is exactly the kind of display where literal green/amber/red is
+ * the expected, most legible convention (every status-page product uses
+ * it), unlike the theme's deliberately neutral chrome everywhere else. */
+export const HEATMAP_CELL_COLOR = {
+  healthy: "bg-emerald-500",
+  degraded: "bg-amber-500",
+  down: "bg-red-500",
+  none: "bg-muted",
+} as const;

@@ -68,3 +68,26 @@ export type ResponseTimeAggregatedPoint = {
 export type ResponseTimeSeries =
   | { kind: "raw"; points: ResponseTimeRawPoint[] }
   | { kind: "aggregated"; points: ResponseTimeAggregatedPoint[] };
+
+/**
+ * One day's worth of uptime history for the per-project heatmap/timeline
+ * (PRD §5.6, Phase 4, #31), one row of `get_project_daily_history()` (see
+ * supabase/migrations/*_create_get_project_daily_history_function.sql).
+ * Hand-widened from the generated RPC return type for the same reason as
+ * `ProjectUptimeSummary` above -- `uptime_percentage`/`avg_response_time_ms`
+ * are genuinely nullable (a day with zero checks, `source: "none"`), which
+ * `returns table (...)` doesn't reflect in the generated type.
+ *
+ * `source` isn't rendered directly, but is why this is its own type instead
+ * of reusing `ProjectUptimeSummary`'s shape -- callers can tell an
+ * already-rolled-up day apart from one this query computed from raw
+ * `checks` on the fly, useful for debugging/future rollup-job validation.
+ */
+export type DailyHistoryPoint = Omit<
+  Database["public"]["Functions"]["get_project_daily_history"]["Returns"][number],
+  "uptime_percentage" | "avg_response_time_ms" | "source"
+> & {
+  uptime_percentage: number | null;
+  avg_response_time_ms: number | null;
+  source: "aggregated" | "raw" | "none";
+};

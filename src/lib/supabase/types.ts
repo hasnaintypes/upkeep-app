@@ -364,6 +364,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_project_daily_history: {
+        Args: { p_days?: number; p_project_id: string }
+        Returns: {
+          avg_response_time_ms: number
+          day: string
+          source: string
+          total_checks: number
+          total_failures: number
+          uptime_percentage: number
+        }[]
+      }
       get_project_uptime_summary: {
         Args: never
         Returns: {

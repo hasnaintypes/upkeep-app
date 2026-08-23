@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  DailyHistoryPoint,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
   ResponseTimeSeries,
@@ -112,4 +113,33 @@ export async function getResponseTimeSeries(
     },
     error: null,
   };
+}
+
+/** Matches the issue's "at minimum the last 90 days" acceptance criterion --
+ * also the SQL function's own default, passed explicitly so this isn't
+ * silently dependent on that default ever staying 90. */
+const HEATMAP_DAYS = 90;
+
+/**
+ * Per-day uptime history for one project's last 90 days, for the
+ * per-project detail page's uptime heatmap/timeline (PRD §5.6, Phase 4,
+ * #31). One RPC round trip (see
+ * supabase/migrations/*_create_get_project_daily_history_function.sql) --
+ * `security invoker`, scoped by the caller's own RLS on
+ * `checks`/`checks_aggregated`, same as `getProjectUptimeSummaries`.
+ */
+export async function getProjectDailyHistory(projectId: string): Promise<{
+  data: DailyHistoryPoint[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_project_daily_history", {
+    p_project_id: projectId,
+    p_days: HEATMAP_DAYS,
+  });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: (data ?? []) as unknown as DailyHistoryPoint[], error: null };
 }
