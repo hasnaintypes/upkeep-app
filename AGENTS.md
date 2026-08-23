@@ -2,7 +2,7 @@
 
 ## What this is
 
-Upkeep — self-hosted uptime/health monitor for personal projects on free-tier hosts. Only the Next.js frontend (marketing site + Supabase auth) exists so far; the prober/dashboard/notification backend is not built yet. Full product spec: `docs/PRD.md` — **gitignored, local-only** (won't exist on a fresh clone; read it if present before building backend features).
+Upkeep — self-hosted uptime/health monitor for personal projects on free-tier hosts. The Next.js frontend (marketing site, Supabase auth, project management) is built; the prober backend (Supabase Edge Functions under `supabase/functions/`) is in progress, dashboard/notification features are not built yet. Full product spec: `docs/PRD.md` — **gitignored, local-only** (won't exist on a fresh clone; read it if present before building backend features).
 
 ## Commands
 
@@ -39,6 +39,29 @@ config outside the repo.
 one). Commit the regenerated file in the same change as the migration. `createClient()` in
 `client.ts`/`server.ts` is generic over the resulting `Database` type — don't hand-edit `types.ts`.
 
+**Verifying SQL directly** (no local Docker/Postgres to test against): `pnpm supabase db query
+--linked "<sql>"` or `--file <path>` runs against the real linked database via the Management API.
+Useful for `EXPLAIN`, checking a new function's query plan, or inserting/deleting throwaway rows to
+exercise a migration — always clean up any rows you insert this way afterward.
+
+### Edge Functions (Supabase CLI)
+
+`supabase/functions/<name>/` — Deno runtime, scaffolded with `pnpm supabase functions new <name>`
+(don't hand-create the folder; the CLI also wires up `[functions.<name>]` in `config.toml`). Uses
+the `withSupabase` helper from `@supabase/server` for auth — pick the narrowest `auth` mode for the
+caller (`"secret"` for cron/service-to-service calls with no user session, `"user"` for calls
+carrying a real session JWT; see a given function's module comment for which and why).
+
+Same hosted-only workflow as the database — no `supabase start`/local Docker stack:
+
+```bash
+pnpm supabase functions deploy <name> --use-api   # bundles server-side, no Docker required
+```
+
+Manually invoking a deployed function needs a **secret key** (Dashboard → Settings → API Keys →
+Secret keys), not the legacy `service_role` JWT — `auth: "secret"` validates against that newer key
+type specifically. If the project only has legacy keys, generate a secret key there first.
+
 ## Architecture
 
 Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
@@ -65,7 +88,8 @@ Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 ## Gotchas
 
 - `next.config.ts` sets `cacheComponents: true`. Any dynamic data access (`cookies()`, `supabase.auth.getClaims()`, etc.) must be isolated in its own component wrapped in `<Suspense>`, or `pnpm build` fails with a "blocking prerender" error. Pattern: see `src/app/protected/page.tsx` — the page component itself stays synchronous; a separate `async function AuthGuard()` does the session check and is rendered inside `<Suspense>`.
-- `tsconfig.json` has no path excludes beyond `node_modules`. Any stray Next.js/TS project left in the repo root (e.g. a copied design template) gets type-checked by `pnpm build` and breaks it — keep unrelated scaffolding out of the repo root, or delete it once you've extracted what you need from it.
+- `tsconfig.json` excludes only `node_modules` and `supabase/functions`. Any stray Next.js/TS project left in the repo root (e.g. a copied design template) still gets type-checked by `pnpm build` and breaks it — keep unrelated scaffolding out of the repo root, or delete it once you've extracted what you need from it.
+- `supabase/functions/**` is Deno, not Node — it has its own `deno.json` import map per function and is excluded from the root `tsconfig.json` (added when the first function was created) specifically because `next build`'s type-checker can't resolve Deno-style specifiers like `@supabase/server`. If you ever see `next build` failing on a `supabase/functions/*.ts` file with "Cannot find module," the exclude is missing, not the package.
 
 ## Working Conventions
 

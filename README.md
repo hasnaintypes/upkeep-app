@@ -88,6 +88,24 @@ pnpm gen:types   # writes src/lib/supabase/types.ts from the linked project's sc
 `createClient()` in `src/lib/supabase/client.ts` and `server.ts` are generic over the generated
 `Database` type — commit `types.ts` along with the migration that changed the schema.
 
+### Edge Functions
+
+The prober backend lives under `supabase/functions/` (Deno runtime). Scaffold new functions with
+the CLI rather than hand-creating the folder:
+
+```bash
+pnpm supabase functions new <name>                 # scaffolds supabase/functions/<name>/
+pnpm supabase functions deploy <name> --use-api     # deploys to the linked project, no Docker needed
+```
+
+Functions use the `withSupabase` helper from `@supabase/server` for auth. Manually invoking a
+deployed function (for testing, or before the cron trigger that calls it automatically exists)
+needs a **secret key** from the dashboard (Settings → API Keys → Secret keys) sent on the `apikey`
+header — the legacy `service_role` key won't pass `auth: "secret"` checks.
+
+To verify a new SQL function/query without a local Postgres instance, run it directly against the
+linked database: `pnpm supabase db query --linked "<sql>"`.
+
 ### Before opening a PR
 
 ```bash

@@ -293,7 +293,36 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_due_projects: {
+        Args: never
+        Returns: {
+          check_interval_seconds: number
+          collection: string | null
+          created_at: string
+          description: string | null
+          expected_body_match: string | null
+          expected_status: number
+          headers: Json | null
+          health_url: string
+          hosting_provider: string | null
+          id: string
+          is_active: boolean
+          keep_alive_enabled: boolean
+          method: string
+          name: string
+          retry_count: number
+          tags: string[] | null
+          timeout_ms: number
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never
