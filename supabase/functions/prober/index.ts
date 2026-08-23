@@ -1,17 +1,18 @@
-// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#26).
+// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#27).
 //
 // Loads due projects (#20, public.get_due_projects() -- a single indexed
 // query, not N+1), fires each one's HTTP health check concurrently,
 // retrying per the project's own retry_count before finalizing a failure
 // (#21-#23, check.ts / retry.ts), classifies each final result into
-// up/down/degraded/waking/unknown (#24, classify.ts), and writes one
-// `checks` row per project (#25, persist.ts). A `pg_cron` job fires this
-// every minute (#26, see the schedule_prober_cron migration). Deliberately
-// does NOT yet do self-monitoring or expose a manual "run now" trigger --
-// those are separate, later Phase 3 tasks per docs/ROADMAP.md. The full
-// per-project outcome (raw + classified + persisted) is still returned in
-// the response too, so this stays testable/inspectable without needing to
-// separately query the `checks` table after every manual invocation.
+// up/down/degraded/waking/unknown (#24, classify.ts), writes one `checks`
+// row per project (#25, persist.ts), and records its own last-successful-
+// run timestamp for self-monitoring (#27, self-monitor.ts). A `pg_cron` job
+// fires this every minute (#26, see the schedule_prober_cron migration).
+// Deliberately does NOT yet expose a manual "run now" trigger for a single
+// project -- that's a separate, later Phase 3 task per docs/ROADMAP.md. The
+// full per-project outcome (raw + classified + persisted) is still returned
+// in the response too, so this stays testable/inspectable without needing
+// to separately query the `checks` table after every manual invocation.
 //
 // Overlap protection (#26): try_acquire_prober_lock() claims a single-row
 // mutex (see the schedule_prober_cron migration for why this is a claimable
@@ -23,6 +24,13 @@
 // mid-run can't leave the lock stuck (the stale-run fallback in
 // try_acquire_prober_lock is a second, independent safety net for the case
 // where the function is killed before even reaching `finally`).
+//
+// Self-monitoring (#27): recordProberSuccess() fires exactly once, right
+// before the final response, once the whole due-check-classify-persist
+// pipeline has completed without throwing -- never from the early-return
+// error branches above it or from the `finally` block below, so a run that
+// errors partway through correctly leaves the last-success timestamp
+// stale/detectable (see self-monitor.ts).
 //
 // Auth: service-to-service only. The cron job above and manual testing both
 // authenticate with a secret key on the `apikey` header -- there is no user
@@ -40,6 +48,7 @@ import type { DueProject } from "./check.ts";
 import { runHealthChecksWithRetry } from "./retry.ts";
 import { classifyCheck } from "./classify.ts";
 import { writeCheckResults } from "./persist.ts";
+import { recordProberSuccess } from "./self-monitor.ts";
 
 const prober = {
   fetch: withSupabase({ auth: "secret" }, async (_req, ctx) => {
@@ -74,6 +83,12 @@ const prober = {
 
       const persisted = await writeCheckResults(ctx.supabaseAdmin, classified);
       const persistedById = new Map(persisted.map((p) => [p.project_id, p]));
+
+      // The pipeline ran to completion without throwing -- a genuine
+      // success (#27), regardless of whether any individual project's own
+      // check came back down/unknown or failed to persist (both already
+      // isolated per-project above, not run-level failures).
+      await recordProberSuccess(ctx.supabaseAdmin);
 
       return Response.json({
         count: classified.length,

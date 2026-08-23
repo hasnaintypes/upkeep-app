@@ -183,6 +183,21 @@ export type Database = {
         }
         Relationships: []
       }
+      prober_health: {
+        Row: {
+          id: boolean
+          last_success_at: string | null
+        }
+        Insert: {
+          id?: boolean
+          last_success_at?: string | null
+        }
+        Update: {
+          id?: boolean
+          last_success_at?: string | null
+        }
+        Relationships: []
+      }
       prober_lock: {
         Row: {
           id: boolean
@@ -345,6 +360,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
       try_acquire_prober_lock: {
         Args: { stale_after_seconds?: number }
