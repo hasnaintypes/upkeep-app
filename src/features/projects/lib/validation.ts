@@ -56,6 +56,14 @@ export const createProjectSchema = z.object({
     .optional(),
   health_url: healthUrlSchema,
   method: z.enum(["GET", "POST", "HEAD"]),
+  // Only meaningful for non-GET methods -- fetch() clients (including the
+  // prober's) reject a body on GET requests, so the prober only sends this
+  // when method !== "GET" (supabase/functions/prober/check.ts).
+  body: z
+    .string()
+    .trim()
+    .max(10000, "Request body must be 10000 characters or fewer.")
+    .optional(),
   expected_status: z.coerce
     .number()
     .int()
@@ -102,6 +110,7 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   description: "",
   health_url: "",
   method: PROJECT_DEFAULTS.method,
+  body: "",
   expected_status: PROJECT_DEFAULTS.expectedStatus,
   check_interval_seconds: PROJECT_DEFAULTS.checkIntervalSeconds,
   timeout_ms: PROJECT_DEFAULTS.timeoutMs,

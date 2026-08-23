@@ -224,6 +224,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          body: string | null
           check_interval_seconds: number
           collection: string | null
           created_at: string
@@ -245,6 +246,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          body?: string | null
           check_interval_seconds?: number
           collection?: string | null
           created_at?: string
@@ -266,6 +268,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          body?: string | null
           check_interval_seconds?: number
           collection?: string | null
           created_at?: string
@@ -296,6 +299,7 @@ export type Database = {
       get_due_projects: {
         Args: never
         Returns: {
+          body: string | null
           check_interval_seconds: number
           collection: string | null
           created_at: string

@@ -54,6 +54,7 @@ function toFormState(project?: Project): FormState {
     description: project.description ?? "",
     health_url: project.health_url,
     method: (project.method as FormState["method"]) ?? "GET",
+    body: project.body ?? "",
     expected_status: project.expected_status,
     check_interval_seconds: project.check_interval_seconds,
     timeout_ms: project.timeout_ms,
@@ -160,6 +161,7 @@ export function AddProjectForm({
           description,
           health_url,
           method,
+          body,
           expected_status,
           check_interval_seconds,
           timeout_ms,
@@ -173,6 +175,7 @@ export function AddProjectForm({
           description,
           health_url,
           method,
+          body,
           expected_status,
           check_interval_seconds,
           timeout_ms,
@@ -306,6 +309,25 @@ export function AddProjectForm({
                     </SelectContent>
                   </Select>
                 </Field>
+
+                {values.method !== "GET" && (
+                  <Field data-invalid={!!fieldErrors.body}>
+                    <FieldLabel htmlFor="body">Request body</FieldLabel>
+                    <Textarea
+                      id="body"
+                      placeholder='{"ping": true}'
+                      rows={3}
+                      aria-invalid={!!fieldErrors.body}
+                      value={values.body}
+                      onChange={(e) => updateField("body", e.target.value)}
+                    />
+                    <FieldDescription>
+                      Sent with {values.method} requests. Set a Content-Type
+                      header below if needed.
+                    </FieldDescription>
+                    <FieldError errors={toFieldErrorMessages(fieldErrors.body)} />
+                  </Field>
+                )}
 
                 <Field
                   orientation="responsive"

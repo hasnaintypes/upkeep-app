@@ -1,4 +1,4 @@
-// HTTP health-check execution (PRD §5.2, Phase 3, issue #21).
+// HTTP health-check execution (PRD §5.2, Phase 3, issues #21-#22).
 //
 // Scope note: this module only fires the request and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
@@ -21,6 +21,7 @@ export type DueProject = {
   method: string;
   headers: unknown;
   timeout_ms: number;
+  body: string | null;
 };
 
 export type CheckResult = {
@@ -54,12 +55,6 @@ function toHeaderRecord(headers: unknown): Record<string, string> {
  * throws -- every failure mode (network error, timeout, non-2xx status)
  * resolves to a CheckResult with `error_message` set instead, so a single
  * bad project can't take down a concurrent batch (see index.ts).
- *
- * Note: the PRD (§5.2) mentions a configurable request "body" alongside
- * method/headers, but the `projects` table (PRD §6 / #5) has no `body`
- * column -- flagging this as a pre-existing spec/schema gap rather than
- * inventing a column as a side effect of this issue. GET/POST both work
- * correctly with no body, which is normal for a health-check endpoint.
  */
 export async function runHealthCheck(project: DueProject): Promise<CheckResult> {
   const controller = new AbortController();
@@ -70,6 +65,12 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
     const response = await fetch(project.health_url, {
       method: project.method,
       headers: toHeaderRecord(project.headers),
+      // GET/HEAD requests must not carry a body -- fetch() throws
+      // ("Request with GET/HEAD method cannot have body") if you try, so
+      // this is only included for methods that actually support one.
+      ...(project.method !== "GET" && project.method !== "HEAD" && project.body
+        ? { body: project.body }
+        : {}),
       signal: controller.signal,
     });
 
