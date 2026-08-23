@@ -61,15 +61,6 @@ export function HeroSection() {
                   priority
                 />
               </div>
-
-              <Image
-                src="https://images.unsplash.com/photo-1772037440088-2ef162671434?q=80&w=1313&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                alt=""
-                width={1313}
-                height={1000}
-                sizes="(max-width: 768px) 100vw, 1280px"
-                className="size-full rotate-180 rounded-3xl object-cover object-bottom"
-              />
             </div>
           </div>
         </div>
