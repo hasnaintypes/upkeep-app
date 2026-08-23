@@ -50,6 +50,14 @@ Copy `.env.example` to `.env.local` and set:
 If left unset, Supabase auth silently no-ops (`hasEnvVars` in `src/lib/utils.ts`) — the app still
 boots and the marketing pages work, but sign in/up and protected routes won't function.
 
+Only needed for `POST /api/projects/register` (programmatic project registration):
+
+| Variable | Description |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (Project Settings → API) — server-only, bypasses RLS. Never expose to the client. |
+| `UPKEEP_REGISTRATION_SECRET` | Shared secret sent as `Authorization: Bearer <secret>`. v1 stub auth pending Phase 6 per-user API keys — see the route's module comment. |
+| `UPKEEP_REGISTRATION_OWNER_USER_ID` | The `auth.users.id` (uuid) that programmatically registered projects are owned by. |
+
 ### Database (Supabase CLI)
 
 The schema lives as code in `supabase/migrations/` — never hand-author tables in the Supabase
