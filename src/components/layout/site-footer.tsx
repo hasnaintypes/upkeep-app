@@ -1,7 +1,32 @@
 import Link from "next/link";
-import { CirclePower } from "lucide-react";
-import { BRAND_NAME, NAV_LINKS } from "@/features/marketing";
-import { isExternalUrl } from "@/lib/utils";
+import { Logo } from "@/components/logo";
+import { BRAND_NAME } from "@/features/marketing";
+
+const links = [
+  {
+    group: "Product",
+    items: [
+      { title: "Features", href: "#features" },
+      { title: "How it works", href: "#how-it-works" },
+      { title: "Pricing", href: "#" },
+    ],
+  },
+  {
+    group: "Resources",
+    items: [
+      { title: "GitHub", href: "https://github.com/hasnaintypes/upkeep-app" },
+      { title: "Docs", href: "#" },
+      { title: "Support", href: "#" },
+    ],
+  },
+  {
+    group: "Legal",
+    items: [
+      { title: "Privacy", href: "#" },
+      { title: "Terms", href: "#" },
+    ],
+  },
+];
 
 async function getCurrentYear() {
   "use cache";
@@ -12,32 +37,36 @@ export async function SiteFooter() {
   const year = await getCurrentYear();
 
   return (
-    <footer className="border-t border-zinc-800 py-12" style={{ backgroundColor: "#09090B" }}>
+    <footer className="bg-background border-b pt-20">
       <div className="mx-auto max-w-5xl px-6">
-        <div className="flex flex-wrap items-center justify-between gap-12">
-          <div className="order-last flex items-center gap-3 md:order-first">
-            <Link href="/" aria-label="go home" className="flex items-center gap-2">
-              <CirclePower className="w-5 h-5 text-white" />
-              <span className="text-white font-semibold">{BRAND_NAME}</span>
+        <div className="grid gap-12 md:grid-cols-5">
+          <div className="md:col-span-2">
+            <Link href="/" aria-label="go home" className="block size-fit">
+              <Logo />
             </Link>
-            <span className="text-zinc-500 block text-center text-sm">
-              © {year} {BRAND_NAME}, all rights reserved
-            </span>
           </div>
 
-          <div className="order-first flex flex-wrap items-center gap-x-6 gap-y-4 md:order-last">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target={isExternalUrl(link.href) ? "_blank" : undefined}
-                rel={isExternalUrl(link.href) ? "noreferrer" : undefined}
-                className="text-zinc-400 hover:text-white block text-sm duration-150"
-              >
-                {link.label}
-              </a>
+          <div className="col-span-3 grid grid-cols-3 gap-6">
+            {links.map((link) => (
+              <div key={link.group} className="space-y-4">
+                <span className="block font-medium">{link.group}</span>
+                {link.items.map((item) => (
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    className="text-muted-foreground hover:text-primary block duration-150"
+                  >
+                    <span>{item.title}</span>
+                  </Link>
+                ))}
+              </div>
             ))}
           </div>
+        </div>
+        <div className="mt-12 flex flex-wrap items-end justify-between gap-6 border-t py-6">
+          <span className="text-muted-foreground order-last block text-center text-sm md:order-first">
+            © {year} {BRAND_NAME}, all rights reserved
+          </span>
         </div>
       </div>
     </footer>
