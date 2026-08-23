@@ -364,6 +364,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_project_uptime_summary: {
+        Args: never
+        Returns: {
+          last_checked_at: string
+          last_status: string
+          project_id: string
+          uptime_24h: number
+          uptime_30d: number
+          uptime_7d: number
+          uptime_90d: number
+        }[]
+      }
       record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
       try_acquire_prober_lock: {

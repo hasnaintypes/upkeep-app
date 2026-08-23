@@ -26,3 +26,27 @@ export async function getProjects(): Promise<{
   }
   return { data: data.map(maskProjectHeaders), error: null };
 }
+
+/**
+ * Lists the current user's *active* projects only, ordered by name -- for
+ * the dashboard overview page (PRD §5.6, #29), which per its own acceptance
+ * criteria only shows "every active project owned by the signed-in user"
+ * (a paused project has nothing current to monitor, so it doesn't belong
+ * on a live status overview). Same RLS-only scoping as `getProjects`.
+ */
+export async function getActiveProjects(): Promise<{
+  data: Project[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: data.map(maskProjectHeaders), error: null };
+}

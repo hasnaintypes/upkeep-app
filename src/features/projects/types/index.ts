@@ -18,6 +18,21 @@ export type ProjectActionResult = {
 };
 
 /**
+ * The five-way health check outcome vocabulary (PRD §5.2), matching both
+ * the `checks_status_valid` check constraint
+ * (supabase/migrations/*_create_checks_table.sql) and the Deno-side
+ * prober's own `CheckStatus` (supabase/functions/prober/classify.ts).
+ * Hand-declared here rather than generated: the `checks.status` column
+ * comes back from the generated `Database` type as plain `string` (Postgres
+ * `text` + a check constraint isn't reflected as a TS union), and the
+ * Deno-side module can't be imported directly (see AGENTS.md's tsconfig
+ * exclusion note) -- this is the one canonical copy on the Next.js side;
+ * other features (e.g. dashboard) import it from here rather than
+ * re-declaring their own.
+ */
+export type CheckStatus = "up" | "down" | "degraded" | "waking" | "unknown";
+
+/**
  * A single project's manual "run check now" outcome (PRD §5.2/§3, issue
  * #28), as returned by the `prober` Edge Function's manual-check path
  * (supabase/functions/prober/manual-check.ts). Hand-declared, not derived
@@ -27,7 +42,7 @@ export type ProjectActionResult = {
  * tsconfig exclusion note) so it can't be imported directly.
  */
 export type ManualCheckResult = {
-  status: "up" | "down" | "degraded" | "waking" | "unknown";
+  status: CheckStatus;
   http_status: number | null;
   response_time_ms: number;
   error_message: string | null;
