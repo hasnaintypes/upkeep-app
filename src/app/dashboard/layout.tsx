@@ -32,7 +32,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="dashboard-shell dark">
       <AppSidebar
         variant="inset"
         userSlot={

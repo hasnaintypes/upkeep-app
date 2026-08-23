@@ -98,6 +98,61 @@
   --sidebar-ring: var(--ring);
 }
 
+/*
+ * Dashboard app shell (/dashboard/*): a fixed dark theme, independent of the
+ * site-wide light/dark toggle (ThemeProvider) -- an admin/app UI reads as a
+ * distinct visual space from the marketing site, not something that should
+ * flip to a white background when a visitor's OS preference is "light".
+ *
+ * Reuses .dark's already-correct foreground/border/muted/etc. values below,
+ * but overrides --sidebar/--background/--card/--popover specifically so the
+ * sidebar (and the grey frame SidebarProvider paints behind an `inset`
+ * sidebar, via its own `has-[[data-variant=inset]]:bg-sidebar`) reads as a
+ * visibly lighter grey than the near-black main content panel -- matching
+ * shadcn's own dashboard-01 reference look, not the uniform single-tone
+ * background this project's default .dark theme uses everywhere else.
+ * Apply alongside `.dark` (e.g. `className="dashboard-shell dark"`), not
+ * instead of it -- `.dark` is what activates Tailwind's `dark:` variant
+ * utilities used inside stock shadcn components (button.tsx/badge.tsx's own
+ * `dark:bg-input/30`-style classes), while this class redeclares every
+ * color token itself so it doesn't depend on `.dark`'s specific values. It
+ * must be defined after `.dark` in this file: both are single-class
+ * selectors of equal specificity, so for the properties they both set,
+ * whichever is later in source order wins.
+ */
+.dashboard-shell {
+  --background: oklch(0.04 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.04 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.04 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  /* Distinctly lighter than --background above -- this is the contrast the
+     screenshot reference is built around. */
+  --sidebar: oklch(0.21 0 0);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+  color-scheme: dark;
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans), "Geist Fallback", sans-serif;
   --font-mono: var(--font-geist-mono), "Geist Mono Fallback", monospace;
