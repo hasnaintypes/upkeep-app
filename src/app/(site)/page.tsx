@@ -12,12 +12,12 @@ export default function Home() {
   return (
     <>
       <HeroSection />
-      <FeaturesSection />
+      {/* <FeaturesSection />
       <HowItWorksSection />
       <ContentSection />
       <IntegrationsSection />
       <FAQSection />
-      <CTASection />
+      <CTASection /> */}
     </>
   );
 }
