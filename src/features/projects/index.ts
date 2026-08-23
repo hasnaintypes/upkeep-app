@@ -9,4 +9,5 @@ export * from "./constants";
 export * from "./lib/actions";
 export * from "./lib/bulk-actions";
 export * from "./lib/queries";
+export * from "./lib/run-check";
 export * from "./types";

@@ -270,6 +270,7 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          last_manual_check_at: string | null
           method: string
           name: string
           retry_count: number
@@ -292,6 +293,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          last_manual_check_at?: string | null
           method?: string
           name: string
           retry_count?: number
@@ -314,6 +316,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          last_manual_check_at?: string | null
           method?: string
           name?: string
           retry_count?: number
@@ -345,6 +348,7 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          last_manual_check_at: string | null
           method: string
           name: string
           retry_count: number
@@ -364,6 +368,10 @@ export type Database = {
       release_prober_lock: { Args: never; Returns: undefined }
       try_acquire_prober_lock: {
         Args: { stale_after_seconds?: number }
+        Returns: boolean
+      }
+      try_claim_manual_check: {
+        Args: { p_cooldown_seconds?: number; p_project_id: string }
         Returns: boolean
       }
     }

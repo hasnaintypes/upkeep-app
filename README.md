@@ -59,7 +59,8 @@ Only needed for `POST /api/projects/register` (programmatic project registration
 | `UPKEEP_REGISTRATION_OWNER_USER_ID` | The `auth.users.id` (uuid) that programmatically registered projects are owned by. |
 
 Needed to invoke Edge Functions that require `auth: "secret"` (e.g. `supabase/functions/prober`) —
-from a future "run check now" Server Action, a `pg_cron` trigger, or manual testing:
+from the "run check now" Server Action (`src/features/projects/lib/run-check.ts`), a `pg_cron`
+trigger, or manual testing:
 
 | Variable | Description |
 | --- | --- |

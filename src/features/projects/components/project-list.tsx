@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Power, PowerOff, Trash2 } from "lucide-react";
+import { Pencil, Power, PowerOff, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,7 +39,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AddProjectForm } from "./add-project-form";
 import { deleteProject, setProjectActive } from "../lib/actions";
-import type { Project } from "../types";
+import { runProjectCheckNow } from "../lib/run-check";
+import type { ManualCheckResult, Project } from "../types";
+
+/** Badge color per manual-check status (#28) -- mirrors the same up/down/
+ * degraded/waking/unknown vocabulary the prober's classifier uses
+ * (supabase/functions/prober/classify.ts), shown here only ephemerally
+ * (this component's own state, not persisted UI) right after a user
+ * triggers a check. */
+const MANUAL_CHECK_BADGE_VARIANT: Record<
+  ManualCheckResult["status"],
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  up: "default",
+  degraded: "secondary",
+  waking: "secondary",
+  down: "destructive",
+  unknown: "outline",
+};
 
 const UNCATEGORIZED = "Uncategorized";
 const ALL_COLLECTIONS = "__all__";
@@ -67,6 +84,9 @@ export function ProjectList({
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [collectionFilter, setCollectionFilter] = useState(ALL_COLLECTIONS);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [runResults, setRunResults] = useState<Record<string, ManualCheckResult>>({});
+  const [runErrors, setRunErrors] = useState<Record<string, string>>({});
 
   const existingCollections = useMemo(
     () =>
@@ -114,6 +134,33 @@ export function ProjectList({
       setProjects((prev) => prev.map((p) => (p.id === data.id ? data : p)));
     } finally {
       setPendingId(null);
+    }
+  }
+
+  /**
+   * Runs an immediate health check for one project (#28), via the Server
+   * Action in lib/run-check.ts. `runningId` disables just that project's
+   * button (same `pendingId`-per-row pattern as handleToggleActive) so
+   * triggering one project's check can't be mistaken for another's, and
+   * the result/error is shown inline on that project's card right away --
+   * no page reload or re-fetch needed, matching every other mutation here.
+   */
+  async function handleRunCheckNow(project: Project) {
+    setRunningId(project.id);
+    setRunErrors((prev) => {
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+    try {
+      const { data, error } = await runProjectCheckNow(project.id);
+      if (error || !data) {
+        setRunErrors((prev) => ({ ...prev, [project.id]: error ?? "Something went wrong." }));
+        return;
+      }
+      setRunResults((prev) => ({ ...prev, [project.id]: data }));
+    } finally {
+      setRunningId(null);
     }
   }
 
@@ -207,8 +254,33 @@ export function ProjectList({
                       ))}
                     </div>
                   )}
+                  {runErrors[project.id] && (
+                    <p className="text-xs text-destructive">{runErrors[project.id]}</p>
+                  )}
+                  {runResults[project.id] && (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      Manual check:
+                      <Badge variant={MANUAL_CHECK_BADGE_VARIANT[runResults[project.id].status]}>
+                        {runResults[project.id].status}
+                      </Badge>
+                      {runResults[project.id].response_time_ms}ms
+                      {runResults[project.id].http_status != null &&
+                        ` · HTTP ${runResults[project.id].http_status}`}
+                    </p>
+                  )}
                 </CardContent>
                 <CardFooter className="justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Run check now"
+                    disabled={runningId === project.id}
+                    onClick={() => handleRunCheckNow(project)}
+                  >
+                    <RefreshCw
+                      className={`size-4 ${runningId === project.id ? "animate-spin" : ""}`}
+                    />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
