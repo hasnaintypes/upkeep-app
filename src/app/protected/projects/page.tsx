@@ -37,9 +37,14 @@ export default function ProjectsPage() {
             Projects you&apos;re monitoring.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/protected/projects/new">Add project</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/protected/projects/import">Import</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/protected/projects/new">Add project</Link>
+          </Button>
+        </div>
       </div>
       <Suspense
         fallback={
