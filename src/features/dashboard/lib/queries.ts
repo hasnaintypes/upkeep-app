@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { CHECK_LOG_PAGE_SIZE } from "../constants";
 import type {
+  CheckLogCursor,
+  CheckLogPage,
+  CheckLogRow,
   DailyHistoryPoint,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
@@ -142,4 +146,86 @@ export async function getProjectDailyHistory(projectId: string): Promise<{
     return { data: null, error: error.message };
   }
   return { data: (data ?? []) as unknown as DailyHistoryPoint[], error: null };
+}
+
+const CHECK_LOG_COLUMNS =
+  "id, status, http_status, response_time_ms, error_message, response_snippet, checked_at";
+
+/**
+ * One page of a project's raw check log, newest-first (PRD §5.6, Phase 4,
+ * #32). Keyset (cursor) pagination on `checked_at`, not `OFFSET` -- every
+ * query here is a `project_id` equality + a `checked_at` range/order, which
+ * `checks_project_id_checked_at_idx (project_id, checked_at desc)` (Phase
+ * 1) serves directly regardless of how deep a caller paginates, unlike
+ * `OFFSET n` which gets slower to skip the further in you go.
+ *
+ * `hasNext`/`hasPrevious` are two cheap `limit(1)` existence checks off the
+ * same index (not reused from the page's own row count) -- correct
+ * regardless of navigation history, including on the very first page
+ * (`hasPrevious` naturally comes back false since nothing is newer than
+ * the newest row already on that page).
+ */
+export async function getProjectChecksPage(
+  projectId: string,
+  cursor?: CheckLogCursor,
+): Promise<{ data: CheckLogPage | null; error: string | null }> {
+  const supabase = await createClient();
+
+  let pageQuery = supabase.from("checks").select(CHECK_LOG_COLUMNS).eq("project_id", projectId);
+
+  if (cursor?.direction === "next") {
+    pageQuery = pageQuery.lt("checked_at", cursor.checkedAt).order("checked_at", {
+      ascending: false,
+    });
+  } else if (cursor?.direction === "previous") {
+    pageQuery = pageQuery.gt("checked_at", cursor.checkedAt).order("checked_at", {
+      ascending: true,
+    });
+  } else {
+    pageQuery = pageQuery.order("checked_at", { ascending: false });
+  }
+
+  const { data, error } = await pageQuery.limit(CHECK_LOG_PAGE_SIZE);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  // "previous" fetches ascending (closest-to-cursor first) so the LIMIT
+  // keeps the rows nearest the cursor -- flip back to newest-first for display.
+  const rows = (cursor?.direction === "previous" ? [...data].reverse() : data) as CheckLogRow[];
+
+  if (rows.length === 0) {
+    return { data: { rows: [], hasNext: false, hasPrevious: false }, error: null };
+  }
+
+  const newest = rows[0].checked_at;
+  const oldest = rows[rows.length - 1].checked_at;
+
+  const [{ count: olderCount, error: olderError }, { count: newerCount, error: newerError }] =
+    await Promise.all([
+      supabase
+        .from("checks")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .lt("checked_at", oldest),
+      supabase
+        .from("checks")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .gt("checked_at", newest),
+    ]);
+
+  if (olderError || newerError) {
+    return { data: null, error: (olderError ?? newerError)!.message };
+  }
+
+  return {
+    data: {
+      rows,
+      hasNext: (olderCount ?? 0) > 0,
+      hasPrevious: (newerCount ?? 0) > 0,
+    },
+    error: null,
+  };
 }

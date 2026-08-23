@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProjectById } from "@/features/projects";
 import {
+  CheckLogTable,
+  getProjectChecksPage,
   getProjectDailyHistory,
   getProjectUptimeSummaries,
   getResponseTimeSeries,
@@ -15,18 +17,18 @@ import {
   UptimeHeatmap,
   UPTIME_WINDOWS,
 } from "@/features/dashboard";
-import type { ResponseTimeSeries, UptimeWindowKey } from "@/features/dashboard";
+import type { CheckLogCursor, ResponseTimeSeries, UptimeWindowKey } from "@/features/dashboard";
 
 /**
- * Per-project detail page (PRD §5.6, Phase 4). Response-time graph (#30)
- * and uptime heatmap/timeline (#31) so far; the raw check log (#32) is a
- * separate, later Phase 4 issue that will add one more section to this
- * same page.
+ * Per-project detail page (PRD §5.6, Phase 4): response-time graph (#30),
+ * uptime heatmap/timeline (#31), and raw check log (#32).
  */
 async function ProjectDetailLoader({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ cursor?: string; dir?: string }>;
 }) {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
@@ -36,6 +38,11 @@ async function ProjectDetailLoader({
   }
 
   const { id } = await params;
+  const { cursor, dir } = await searchParams;
+  const checksCursor: CheckLogCursor | undefined =
+    cursor && (dir === "next" || dir === "previous")
+      ? { checkedAt: cursor, direction: dir }
+      : undefined;
 
   const [{ data: project, error: projectError }, { data: summaries }] = await Promise.all([
     getProjectById(id),
@@ -50,7 +57,11 @@ async function ProjectDetailLoader({
 
   const summary = summaries?.find((s) => s.project_id === project.id) ?? null;
 
-  const [seriesEntries, { data: dailyHistory, error: historyError }] = await Promise.all([
+  const [
+    seriesEntries,
+    { data: dailyHistory, error: historyError },
+    { data: checksPage, error: checksError },
+  ] = await Promise.all([
     Promise.all(
       UPTIME_WINDOWS.map(async (w) => {
         const { data } = await getResponseTimeSeries(project.id, w.key);
@@ -58,6 +69,7 @@ async function ProjectDetailLoader({
       }),
     ),
     getProjectDailyHistory(project.id),
+    getProjectChecksPage(project.id, checksCursor),
   ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
     UptimeWindowKey,
@@ -95,6 +107,15 @@ async function ProjectDetailLoader({
       ) : (
         <UptimeHeatmap history={dailyHistory ?? []} />
       )}
+
+      {checksError ? (
+        <p className="text-sm text-destructive">Failed to load check log: {checksError}</p>
+      ) : (
+        <CheckLogTable
+          projectId={project.id}
+          page={checksPage ?? { rows: [], hasNext: false, hasPrevious: false }}
+        />
+      )}
     </div>
   );
 }
@@ -110,12 +131,14 @@ function ProjectDetailSkeleton() {
 
 export default function ProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ cursor?: string; dir?: string }>;
 }) {
   return (
     <Suspense fallback={<ProjectDetailSkeleton />}>
-      <ProjectDetailLoader params={params} />
+      <ProjectDetailLoader params={params} searchParams={searchParams} />
     </Suspense>
   );
 }

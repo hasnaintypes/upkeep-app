@@ -65,3 +65,6 @@ export const HEATMAP_CELL_COLOR = {
   down: "bg-red-500",
   none: "bg-muted",
 } as const;
+
+/** Rows per page for the raw check log table (PRD §5.6, Phase 4, #32). */
+export const CHECK_LOG_PAGE_SIZE = 25;

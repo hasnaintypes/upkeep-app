@@ -91,3 +91,41 @@ export type DailyHistoryPoint = Omit<
   avg_response_time_ms: number | null;
   source: "aggregated" | "raw" | "none";
 };
+
+/**
+ * One `checks` row as shown in the raw check log table (PRD §5.6, Phase 4,
+ * #32). `response_snippet` is included here even though it's only ever
+ * non-null on a failed check (see persist.ts's own comment on that column)
+ * -- the table renders it behind an expand/detail control per row, not
+ * inline, per the issue's acceptance criteria.
+ */
+export type CheckLogRow = {
+  id: string;
+  status: CheckStatus;
+  http_status: number | null;
+  response_time_ms: number | null;
+  error_message: string | null;
+  response_snippet: string | null;
+  checked_at: string;
+};
+
+/**
+ * One page of a project's check log, keyset-paginated by `checked_at`
+ * (#32) -- not offset-based, so a deep page against a project with
+ * thousands of checks is still a single indexed range scan on
+ * `checks_project_id_checked_at_idx (project_id, checked_at desc)`, not an
+ * offset scan that gets slower the further you paginate.
+ */
+export type CheckLogPage = {
+  rows: CheckLogRow[];
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
+/** Which direction to paginate from a given `checked_at` cursor -- "next"
+ * means older rows (further down the log), "previous" means newer rows
+ * (back toward the top). */
+export type CheckLogCursor = {
+  checkedAt: string;
+  direction: "next" | "previous";
+};

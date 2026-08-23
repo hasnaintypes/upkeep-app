@@ -10,6 +10,7 @@ export { DashboardHeader } from "./components/dashboard-header";
 export { ResponseTimeChart } from "./components/response-time-chart";
 export { ResponseTimeSection } from "./components/response-time-section";
 export { UptimeHeatmap } from "./components/uptime-heatmap";
+export { CheckLogTable } from "./components/check-log-table";
 
 export * from "./constants";
 export * from "./lib/queries";
