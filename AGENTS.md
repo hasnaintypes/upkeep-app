@@ -13,7 +13,9 @@ pnpm start    # run production build
 pnpm lint     # eslint
 ```
 
-No test suite exists yet.
+No test suite exists for the Next.js app yet. `supabase/functions/<name>/` modules do have Deno
+unit tests (e.g. `prober/classify.test.ts`, `prober/persist.test.ts`) — see the Edge Functions
+section below for how to run them.
 
 **Run `pnpm lint` before `pnpm build`, or delete `.next/` first.** `eslint.config.mjs` has no ignore patterns, so a stale `.next/` build directory gets linted too and floods the output with hundreds of unrelated errors from bundled/minified JS.
 
@@ -57,6 +59,17 @@ Same hosted-only workflow as the database — no `supabase start`/local Docker s
 ```bash
 pnpm supabase functions deploy <name> --use-api   # bundles server-side, no Docker required
 ```
+
+The Deno CLI (installed separately, e.g. `npm install -g deno` — not a project dependency) runs
+each function's own tests and type-checks directly against its `deno.json` import map, with no
+Docker/local Supabase stack needed:
+
+```bash
+deno test           # from inside supabase/functions/<name>/
+deno check *.ts      # type-checks against Deno-style specifiers next build can't resolve
+```
+
+Commit the `deno.lock` this generates per function, same reasoning as `pnpm-lock.yaml`.
 
 Manually invoking a deployed function needs a **secret key** (Dashboard → Settings → API Keys →
 Secret keys), not the legacy `service_role` JWT — `auth: "secret"` validates against that newer key
