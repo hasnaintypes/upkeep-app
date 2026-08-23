@@ -1,14 +1,16 @@
-// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#24).
+// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#25).
 //
 // Loads due projects (#20, public.get_due_projects() -- a single indexed
 // query, not N+1), fires each one's HTTP health check concurrently,
 // retrying per the project's own retry_count before finalizing a failure
-// (#21-#23, check.ts / retry.ts), then classifies each final result into
-// up/down/degraded/waking/unknown (#24, classify.ts). Deliberately does NOT
-// yet write results to the `checks` table -- that's a separate, later Phase
-// 3 task per docs/ROADMAP.md. For now the raw + classified per-project
-// results are returned directly in the response so this stays independently
-// testable.
+// (#21-#23, check.ts / retry.ts), classifies each final result into
+// up/down/degraded/waking/unknown (#24, classify.ts), and writes one
+// `checks` row per project (#25, persist.ts). Deliberately does NOT yet
+// wire up the actual cron trigger or self-monitoring -- those are separate,
+// later Phase 3 tasks per docs/ROADMAP.md. The full per-project outcome
+// (raw + classified + persisted) is still returned in the response too, so
+// this stays testable/inspectable without needing to separately query the
+// `checks` table after every manual invocation.
 //
 // Auth: service-to-service only. Cron/Scheduled Trigger invocations (wired
 // up in a later issue) and manual testing both authenticate with a secret
@@ -25,6 +27,7 @@ import { withSupabase } from "@supabase/server";
 import type { DueProject } from "./check.ts";
 import { runHealthChecksWithRetry } from "./retry.ts";
 import { classifyCheck } from "./classify.ts";
+import { writeCheckResults } from "./persist.ts";
 
 const prober = {
   fetch: withSupabase({ auth: "secret" }, async (_req, ctx) => {
@@ -41,13 +44,21 @@ const prober = {
     const projectById = new Map(projects.map((p) => [p.id, p]));
 
     const classified = results.map((result) => ({
-      ...result,
+      result,
       status: classifyCheck(result, projectById.get(result.project_id)!),
     }));
 
+    const persisted = await writeCheckResults(ctx.supabaseAdmin, classified);
+    const persistedById = new Map(persisted.map((p) => [p.project_id, p]));
+
     return Response.json({
       count: classified.length,
-      results: classified,
+      results: classified.map(({ result, status }) => ({
+        ...result,
+        status,
+        persisted: persistedById.get(result.project_id)?.persisted ?? false,
+        persist_error: persistedById.get(result.project_id)?.error ?? null,
+      })),
     });
   }),
 };
