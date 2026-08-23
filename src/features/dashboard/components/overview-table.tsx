@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -65,10 +66,12 @@ export function OverviewTable({
                 <StatusBadge status={summary?.last_status ?? null} />
               </TableCell>
               <TableCell className="max-w-64">
-                {/* Not a link yet -- the per-project detail page is a
-                    separate, later Phase 4 issue (#30-32); this cell will
-                    become a Link once that route exists. */}
-                <p className="font-medium">{project.name}</p>
+                <Link
+                  href={`/dashboard/projects/${project.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {project.name}
+                </Link>
                 <p className="truncate text-xs text-muted-foreground">
                   {project.health_url}
                 </p>

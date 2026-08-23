@@ -50,3 +50,30 @@ export async function getActiveProjects(): Promise<{
   }
   return { data: data.map(maskProjectHeaders), error: null };
 }
+
+/**
+ * Fetches one of the current user's projects by id, for the per-project
+ * detail page (PRD §5.6, Phase 4, #30). Same RLS-only scoping as
+ * `getProjects` -- a mismatched/foreign id is indistinguishable from a
+ * nonexistent one (PGRST116, "no rows"), which is the correct "not found"
+ * behavior either way, not a data leak.
+ */
+export async function getProjectById(id: string): Promise<{
+  data: Project | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return { data: null, error: "Project not found." };
+    }
+    return { data: null, error: error.message };
+  }
+  return { data: maskProjectHeaders(data), error: null };
+}

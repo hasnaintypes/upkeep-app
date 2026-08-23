@@ -229,7 +229,11 @@ export function ProjectList({
               <Card key={project.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{project.name}</CardTitle>
+                    <CardTitle className="text-base">
+                      <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
+                        {project.name}
+                      </Link>
+                    </CardTitle>
                     <Badge variant={project.is_active ? "default" : "secondary"}>
                       {project.is_active ? "Active" : "Paused"}
                     </Badge>

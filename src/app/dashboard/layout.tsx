@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar, DashboardHeader, NavUser } from "@/features/dashboard";
 
@@ -33,16 +34,29 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider className="dashboard-shell dark">
-      <AppSidebar
-        variant="inset"
-        userSlot={
-          <Suspense fallback={null}>
-            <NavUserLoader />
-          </Suspense>
-        }
-      />
+      {/* AppSidebar (via NavMain) and DashboardHeader both call
+          usePathname() for active-route highlighting/page titles -- a
+          dynamic client hook, which under cacheComponents: true must be
+          inside its own <Suspense> boundary or the build fails with a
+          "blocking prerender" error. This only surfaces for a *dynamic*
+          route (e.g. /dashboard/projects/[id], #30) that has no
+          generateStaticParams -- known static routes like /dashboard don't
+          hit it, since Next.js can bake a fixed pathname into their shell
+          at build time. */}
+      <Suspense fallback={<Skeleton className="hidden h-svh w-(--sidebar-width) md:block" />}>
+        <AppSidebar
+          variant="inset"
+          userSlot={
+            <Suspense fallback={null}>
+              <NavUserLoader />
+            </Suspense>
+          }
+        />
+      </Suspense>
       <SidebarInset>
-        <DashboardHeader />
+        <Suspense fallback={<Skeleton className="h-12 w-full" />}>
+          <DashboardHeader />
+        </Suspense>
         <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>

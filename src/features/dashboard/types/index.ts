@@ -25,3 +25,46 @@ export type ProjectUptimeSummary = Omit<
   uptime_30d: number | null;
   uptime_90d: number | null;
 };
+
+/**
+ * One raw `checks` row's worth of response-time data, for the 24h/7d
+ * windows of the per-project response-time graph (PRD §5.6, Phase 4, #30).
+ * `responseTimeMs` is `null` whenever it wouldn't be a meaningful latency
+ * value -- a timeout (the full timeout duration, not a real response) or a
+ * network/DNS error (`status: "unknown"`, no response was ever received) --
+ * `failed` flags exactly those points so the chart can render them as
+ * distinct markers instead of plotting a misleading number or silently
+ * dropping them.
+ */
+export type ResponseTimeRawPoint = {
+  checkedAt: string;
+  responseTimeMs: number | null;
+  failed: boolean;
+  status: CheckStatus;
+};
+
+/**
+ * One `checks_aggregated` row's worth of response-time data, for the
+ * 30d/90d windows (read from the rollup table instead of raw `checks` to
+ * keep the page fast at that range -- see the issue's acceptance
+ * criteria). `totalFailures` is what lets the chart distinguish periods
+ * that had failures, since individual failed checks aren't available at
+ * this granularity.
+ */
+export type ResponseTimeAggregatedPoint = {
+  periodStart: string;
+  avgResponseTimeMs: number;
+  totalChecks: number;
+  totalFailures: number;
+};
+
+/**
+ * Response-time series for one project + one window (#30). A discriminated
+ * union, not one flat shape -- 24h/7d ("raw") and 30d/90d ("aggregated")
+ * come from different tables with genuinely different granularity (every
+ * check vs. one row per rollup period), and the chart renders each kind
+ * differently (per-check failure markers vs. per-period failure counts).
+ */
+export type ResponseTimeSeries =
+  | { kind: "raw"; points: ResponseTimeRawPoint[] }
+  | { kind: "aggregated"; points: ResponseTimeAggregatedPoint[] };
