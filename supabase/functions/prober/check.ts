@@ -2,15 +2,17 @@
 //
 // Scope note: this module only fires the request and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
-// degraded/waking/unknown), retry-on-failure, or write anything to the
-// `checks` table -- those are separate, later Phase 3 tasks per
+// degraded/waking/unknown) or retry-on-failure, and doesn't write anything
+// to the `checks` table -- those are separate, later Phase 3 tasks per
 // docs/ROADMAP.md, and mixing them in here would make each one harder to
 // reason about and test independently.
 //
-// `project.timeout_ms` IS used here, but only as a bare hang-prevention
-// guard (AbortController) -- "per-project timeout enforcement" as its own
-// roadmap task most likely means retry/backoff semantics specific to
-// timeouts, which stays out of scope here.
+// Per-project timeout enforcement (#22): each request is aborted via
+// AbortController at exactly `project.timeout_ms` -- never a hardcoded
+// global value -- and a timeout is reported via the distinct `timed_out`
+// flag on CheckResult, not just embedded in `error_message` text. A future
+// status-classification step should branch on `timed_out` directly rather
+// than string-matching the message (e.g. for "unknown" vs "down").
 
 /** The subset of a `projects` row this module needs. Kept minimal and
  * local rather than importing the Next.js app's generated Database type --
@@ -30,6 +32,11 @@ export type CheckResult = {
   response_time_ms: number;
   response_snippet: string | null;
   error_message: string | null;
+  /** True only when the request was aborted for exceeding project.timeout_ms
+   * -- a structured, machine-readable signal so a later status-classification
+   * step can react to "timed out" without parsing error_message text. Never
+   * true alongside a successful response. */
+  timed_out: boolean;
 };
 
 /** Matches the `checks.response_snippet` column's intended use (PRD §6) --
@@ -85,9 +92,14 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
       response_time_ms: responseTimeMs,
       response_snippet: bodyText.slice(0, RESPONSE_SNIPPET_MAX_LENGTH) || null,
       error_message: null,
+      timed_out: false,
     };
   } catch (err) {
     const responseTimeMs = Math.round(performance.now() - startedAt);
+    // AbortError is exactly and only what our own timeout abort() produces
+    // here (no other abort trigger exists in this function), so it's a
+    // reliable signal that this specific failure was a timeout, not some
+    // other network error (DNS failure, connection refused, TLS error, etc).
     const isTimeout = err instanceof Error && err.name === "AbortError";
 
     return {
@@ -100,6 +112,7 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
         : err instanceof Error
           ? err.message
           : "Unknown error",
+      timed_out: isTimeout,
     };
   } finally {
     clearTimeout(timeoutId);
@@ -130,6 +143,7 @@ export async function runHealthChecks(
             result.reason instanceof Error
               ? result.reason.message
               : "Unknown error",
+          timed_out: false,
         },
   );
 }
