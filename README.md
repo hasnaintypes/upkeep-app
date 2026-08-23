@@ -58,6 +58,13 @@ Only needed for `POST /api/projects/register` (programmatic project registration
 | `UPKEEP_REGISTRATION_SECRET` | Shared secret sent as `Authorization: Bearer <secret>`. v1 stub auth pending Phase 6 per-user API keys — see the route's module comment. |
 | `UPKEEP_REGISTRATION_OWNER_USER_ID` | The `auth.users.id` (uuid) that programmatically registered projects are owned by. |
 
+Needed to invoke Edge Functions that require `auth: "secret"` (e.g. `supabase/functions/prober`) —
+from a future "run check now" Server Action, a `pg_cron` trigger, or manual testing:
+
+| Variable | Description |
+| --- | --- |
+| `SUPABASE_SECRET_KEY` | A Supabase **Secret key** (Dashboard → Settings → API Keys → Secret keys) — distinct from `SUPABASE_SERVICE_ROLE_KEY`. Generate one there if your project only has the legacy service role key. |
+
 ### Database (Supabase CLI)
 
 The schema lives as code in `supabase/migrations/` — never hand-author tables in the Supabase

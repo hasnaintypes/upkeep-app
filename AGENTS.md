@@ -60,7 +60,9 @@ pnpm supabase functions deploy <name> --use-api   # bundles server-side, no Dock
 
 Manually invoking a deployed function needs a **secret key** (Dashboard → Settings → API Keys →
 Secret keys), not the legacy `service_role` JWT — `auth: "secret"` validates against that newer key
-type specifically. If the project only has legacy keys, generate a secret key there first.
+type specifically. If the project only has legacy keys, generate a secret key there first. Store it
+as `SUPABASE_SECRET_KEY` (see `.env.example`) — the same value future server-side callers (a
+"run check now" Server Action, a `pg_cron` trigger) will need to invoke `auth: "secret"` functions.
 
 ## Architecture
 
