@@ -27,7 +27,7 @@ import type { DueProject } from "./check.ts";
 import { runHealthCheckWithRetry } from "./retry.ts";
 import { classifyCheck } from "./classify.ts";
 import { writeCheckResult, type InsertableClient } from "./persist.ts";
-import { maybeOpenIncident, type IncidentClient } from "./incidents.ts";
+import { maybeOpenIncident, maybeResolveIncident, type IncidentClient } from "./incidents.ts";
 
 /** The minimal shape this module needs to look up one project by id --
  * mirrors persist.ts's InsertableClient in spirit: narrow and structural,
@@ -77,12 +77,18 @@ export async function runManualCheck(
   const status = classifyCheck(result, project);
   const persisted = await writeCheckResult(supabaseAdmin, result, status);
 
-  // Same incident detection (#35) as the batch path -- a manual "run check
-  // now" can just as validly be the check that crosses the escalation
-  // threshold, and skips it the same way on a failed write (persisted ===
-  // false means there's no new `checks` row for maybeOpenIncident to see).
+  // Same incident detection/resolution (#35/#36) as the batch path -- a
+  // manual "run check now" can just as validly be the check that crosses
+  // the escalation threshold or confirms recovery, and skips both the same
+  // way on a failed write (persisted === false means there's no new
+  // `checks` row for either to see). Only one of the two ever actually
+  // queries anything for a given `status` (see incidents.ts), so running
+  // both unconditionally is no more expensive than branching here first.
   const incident = persisted.persisted
-    ? await maybeOpenIncident(supabaseAdmin, result.project_id, status)
+    ? {
+        opened: await maybeOpenIncident(supabaseAdmin, result.project_id, status),
+        resolved: await maybeResolveIncident(supabaseAdmin, result.project_id, status),
+      }
     : null;
 
   return Response.json({

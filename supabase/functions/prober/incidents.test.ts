@@ -1,12 +1,18 @@
 // Unit tests for incidents.ts (issue #35 AC: exactly one incident per
 // streak, correct started_at, no incident for a sub-threshold blip, and a
-// cause derived from the triggering checks). Run with `deno test` from this
-// directory -- no Docker, no Supabase project, no network access required.
+// cause derived from the triggering checks; issue #36 AC: resolution lands
+// on the Mth consecutive `up` check, a flapping project never reaches that
+// threshold and stays on the same open incident, and resolving updates
+// that same row rather than inserting a new one). Run with `deno test`
+// from this directory -- no Docker, no Supabase project, no network access
+// required.
 import { assertEquals, assertExists } from "jsr:@std/assert@1";
 import {
   crossesEscalationThreshold,
   deriveIncidentCause,
   maybeOpenIncident,
+  maybeResolveIncident,
+  meetsRecoveryThreshold,
   type IncidentClient,
   type RecentCheck,
 } from "./incidents.ts";
@@ -109,12 +115,18 @@ Deno.test("deriveIncidentCause: down with neither error_message nor http_status 
 // --- maybeOpenIncident (integration of the two pure functions + client) ---
 
 /** A configurable fake IncidentClient: records every `checks`/`incidents`
- * insert call it receives, and returns canned data for the two selects. */
+ * insert/update call it receives, and returns canned data for the two
+ * selects. */
 function fakeClient(options: {
   recentChecks: RecentCheck[];
   openIncidents: { id: string }[];
-}): { client: IncidentClient; inserted: Record<string, unknown>[] } {
+}): {
+  client: IncidentClient;
+  inserted: Record<string, unknown>[];
+  updated: { values: Record<string, unknown>; id: string }[];
+} {
   const inserted: Record<string, unknown>[] = [];
+  const updated: { values: Record<string, unknown>; id: string }[] = [];
 
   const client = {
     from(table: string) {
@@ -145,6 +157,12 @@ function fakeClient(options: {
             inserted.push(values);
             return Promise.resolve({ error: null });
           },
+          update: (values: Record<string, unknown>) => ({
+            eq: (_column: string, id: string) => {
+              updated.push({ values, id });
+              return Promise.resolve({ error: null });
+            },
+          }),
         };
       }
 
@@ -153,7 +171,7 @@ function fakeClient(options: {
     // deno-lint-ignore no-explicit-any
   } as any;
 
-  return { client, inserted };
+  return { client, inserted, updated };
 }
 
 Deno.test("maybeOpenIncident: an up check never queries anything -- 'not_failing'", async () => {
@@ -230,5 +248,161 @@ Deno.test("maybeOpenIncident: surfaces (not throws) a checks-query error", async
 
   const result = await maybeOpenIncident(client, "project-1", "down", 2);
   assertEquals(result.opened, false);
+  assertExists((result as { error?: string }).error);
+});
+
+// --- meetsRecoveryThreshold -------------------------------------------------
+
+Deno.test("meetsRecoveryThreshold: fewer checks than threshold -> false", () => {
+  assertEquals(meetsRecoveryThreshold([check({ status: "up" })], 2), false);
+});
+
+Deno.test("meetsRecoveryThreshold: exactly threshold, all up -> true", () => {
+  assertEquals(
+    meetsRecoveryThreshold([check({ status: "up" }), check({ status: "up" })], 2),
+    true,
+  );
+});
+
+Deno.test("meetsRecoveryThreshold: a single recovery blip (up then down, newest-first) -> false", () => {
+  assertEquals(
+    meetsRecoveryThreshold([check({ status: "up" }), check({ status: "down" })], 2),
+    false,
+  );
+});
+
+Deno.test("meetsRecoveryThreshold: waking does not count as full recovery", () => {
+  assertEquals(
+    meetsRecoveryThreshold([check({ status: "up" }), check({ status: "waking" })], 2),
+    false,
+  );
+});
+
+// --- maybeResolveIncident ----------------------------------------------------
+
+Deno.test("maybeResolveIncident: a down/degraded check never queries anything -- 'not_recovering'", async () => {
+  const throwingClient = {
+    from() {
+      throw new Error("should not be called for a non-up check");
+    },
+    // deno-lint-ignore no-explicit-any
+  } as any;
+
+  const result = await maybeResolveIncident(throwingClient, "project-1", "down", 2);
+  assertEquals(result, { resolved: false, reason: "not_recovering" });
+});
+
+Deno.test("maybeResolveIncident: no open incident -> skips the checks lookup entirely", async () => {
+  let checksQueried = false;
+  const client = {
+    from(table: string) {
+      if (table === "incidents") {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            }),
+          }),
+        };
+      }
+      if (table === "checks") {
+        checksQueried = true;
+        throw new Error("should not query checks when no incident is open");
+      }
+      throw new Error(`unexpected table: ${table}`);
+    },
+    // deno-lint-ignore no-explicit-any
+  } as any;
+
+  const result = await maybeResolveIncident(client, "project-1", "up", 2);
+  assertEquals(result, { resolved: false, reason: "no_open_incident" });
+  assertEquals(checksQueried, false);
+});
+
+Deno.test("maybeResolveIncident: a single up check (below threshold) leaves the incident open", async () => {
+  const { client, updated } = fakeClient({
+    recentChecks: [check({ status: "up" })],
+    openIncidents: [{ id: "incident-1" }],
+  });
+
+  const result = await maybeResolveIncident(client, "project-1", "up", 2);
+  assertEquals(result, { resolved: false, reason: "below_threshold" });
+  assertEquals(updated.length, 0);
+});
+
+Deno.test("maybeResolveIncident: M consecutive up checks resolves the open incident, end time = newest (Mth) check", async () => {
+  const olderUp = check({ status: "up", checked_at: "2026-08-24T00:05:00Z" });
+  const newestUp = check({ status: "up", checked_at: "2026-08-24T00:06:00Z" });
+  const { client, updated } = fakeClient({
+    recentChecks: [newestUp, olderUp], // newest-first, as the real query returns
+    openIncidents: [{ id: "incident-1" }],
+  });
+
+  const result = await maybeResolveIncident(client, "project-1", "up", 2);
+
+  assertEquals(result, {
+    resolved: true,
+    incidentId: "incident-1",
+    resolvedAt: newestUp.checked_at,
+  });
+  assertEquals(updated.length, 1);
+  assertEquals(updated[0].id, "incident-1");
+  assertEquals(updated[0].values.resolved_at, newestUp.checked_at);
+});
+
+Deno.test("maybeResolveIncident: a flapping project (never M consecutive ups) never resolves, no update issued", async () => {
+  // newest-first: up, down, up -- never two `up`s back to back.
+  const { client, updated } = fakeClient({
+    recentChecks: [
+      check({ status: "up", checked_at: "2026-08-24T00:03:00Z" }),
+      check({ status: "down", checked_at: "2026-08-24T00:02:00Z" }),
+    ],
+    openIncidents: [{ id: "incident-1" }],
+  });
+
+  const result = await maybeResolveIncident(client, "project-1", "up", 2);
+  assertEquals(result, { resolved: false, reason: "below_threshold" });
+  assertEquals(updated.length, 0);
+});
+
+Deno.test("maybeResolveIncident: surfaces (not throws) an update error", async () => {
+  const client = {
+    from(table: string) {
+      if (table === "incidents") {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                limit: () => Promise.resolve({ data: [{ id: "incident-1" }], error: null }),
+              }),
+            }),
+          }),
+          update: () => ({
+            eq: () => Promise.resolve({ error: { message: "connection reset" } }),
+          }),
+        };
+      }
+      if (table === "checks") {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: () => ({
+                limit: () =>
+                  Promise.resolve({
+                    data: [check({ status: "up" }), check({ status: "up" })],
+                    error: null,
+                  }),
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    },
+    // deno-lint-ignore no-explicit-any
+  } as any;
+
+  const result = await maybeResolveIncident(client, "project-1", "up", 2);
+  assertEquals(result.resolved, false);
   assertExists((result as { error?: string }).error);
 });

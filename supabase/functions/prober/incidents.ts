@@ -1,32 +1,42 @@
-// Incident auto-detection (PRD §5.4, Phase 5, issue #35): groups a sustained
-// run of consecutive down/degraded checks into a single `incidents` row
-// instead of leaving disconnected `checks` rows as the only record of an
-// outage.
+// Incident auto-detection and auto-resolution (PRD §5.4, Phase 5, issues
+// #35/#36): groups a sustained run of consecutive down/degraded checks into
+// a single `incidents` row instead of leaving disconnected `checks` rows as
+// the only record of an outage, then closes that same row once the project
+// has recovered for a sustained run of its own.
 //
-// Escalation threshold is the Phase 5 readiness-checklist decision recorded
-// in docs/ROADMAP.md -- not invented ad hoc here, mirroring how Phase 3's
+// Both thresholds are the Phase 5 readiness-checklist decision recorded in
+// docs/ROADMAP.md -- not invented ad hoc here, mirroring how Phase 3's
 // status-classification thresholds were decided in classify.ts (#24).
-// **Decided (#35): N = 2** consecutive down/degraded checks opens an
-// incident -- a single blip doesn't count (PRD §5.4's "suppress noise from
-// single transient blips"), but waiting for a 3rd+ would push MTTD past PRD
-// §9's "under 2x the configured check interval" target. Auto-resolve (M
-// consecutive `up` checks to close an incident) is Phase 5's next roadmap
-// task, not this one -- this module only ever opens incidents.
+// **Decided (#35/#36): N = 2** consecutive down/degraded checks opens an
+// incident, **M = 2** consecutive `up` checks resolves it -- a single blip
+// in either direction doesn't count (PRD §5.4's "suppress noise from single
+// transient blips"), but waiting for a 3rd+ in either direction would push
+// MTTD past PRD §9's "under 2x the configured check interval" target. The
+// two thresholds are independent decisions that happen to share the same
+// value here, not the same constant reused for both directions -- see
+// AUTO_RESOLVE_THRESHOLD below.
 //
-// Only "down"/"degraded" count toward the streak, per the PRD's own wording
-// ("consecutive down/degraded checks"): a "waking" check is a genuinely
-// successful response (just slow, see classify.ts) and an "unknown" check
-// means the request itself couldn't be classified as a real failure
-// (DNS/network error) -- either one breaks an in-progress streak rather
-// than extending it.
+// Only "down"/"degraded" count toward the failing streak (escalation), and
+// only "up" counts toward the recovery streak (auto-resolve), per the PRD's
+// own wording for each. A "waking" check is a genuinely successful response
+// (just slow, see classify.ts) but isn't full recovery either -- it breaks
+// a failing streak without resetting the recovery counter to zero the way a
+// real "up" does. An "unknown" check means the request itself couldn't be
+// classified as a real failure (DNS/network error) -- it breaks a failing
+// streak the same way, without counting as recovery.
 //
-// This only evaluates the most recent ESCALATION_THRESHOLD checks each time
-// a new one is written -- it deliberately does not backfill incidents for
-// an outage that was already longer than the threshold *before* this code
-// was deployed (there is no "incident detection" running retroactively over
-// pre-existing `checks` rows).
+// Both directions only evaluate the most recent THRESHOLD checks each time
+// a new one is written -- neither backfills for a streak that was already
+// longer than its threshold *before* this code was deployed (there is no
+// detection/resolution running retroactively over pre-existing `checks`
+// rows).
 
 export const ESCALATION_THRESHOLD = 2;
+
+/** Independent from ESCALATION_THRESHOLD (see module comment) -- currently
+ * the same value, but each can be tuned separately without affecting the
+ * other. */
+export const AUTO_RESOLVE_THRESHOLD = 2;
 
 export type RecentCheck = {
   status: string;
@@ -53,6 +63,25 @@ export function crossesEscalationThreshold(
   return recentChecksDesc
     .slice(0, threshold)
     .every((check) => check.status === "down" || check.status === "degraded");
+}
+
+/**
+ * True only when at least `threshold` checks are on record and every one of
+ * the most-recent `threshold` (already ordered newest-first) is `up` --
+ * the auto-resolve mirror of `crossesEscalationThreshold`. Deliberately
+ * strict about `"up"` specifically (not `"waking"` too): a slow-but-
+ * successful response isn't the same "fully recovered" signal as a fast
+ * matching one, and treating it as equivalent recovery would resolve
+ * incidents earlier than the project actually stabilized.
+ */
+export function meetsRecoveryThreshold(
+  recentChecksDesc: RecentCheck[],
+  threshold: number = AUTO_RESOLVE_THRESHOLD,
+): boolean {
+  if (recentChecksDesc.length < threshold) {
+    return false;
+  }
+  return recentChecksDesc.slice(0, threshold).every((check) => check.status === "up");
 }
 
 /**
@@ -127,6 +156,12 @@ export type IncidentClient = {
     insert(values: Record<string, unknown>): PromiseLike<{
       error: { message: string } | null;
     }>;
+    update(values: Record<string, unknown>): {
+      eq(
+        column: string,
+        value: string,
+      ): PromiseLike<{ error: { message: string } | null }>;
+    };
   };
 };
 
@@ -134,6 +169,11 @@ export type IncidentResult =
   | { opened: false; reason: "not_failing" | "below_threshold" | "already_open" }
   | { opened: false; reason: "error"; error: string }
   | { opened: true; startedAt: string; cause: string };
+
+export type ResolutionResult =
+  | { resolved: false; reason: "not_recovering" | "no_open_incident" | "below_threshold" }
+  | { resolved: false; reason: "error"; error: string }
+  | { resolved: true; incidentId: string; resolvedAt: string };
 
 /**
  * Called once per project immediately after a check has just been
@@ -186,9 +226,9 @@ export async function maybeOpenIncident(
   }
 
   if (openIncidents && openIncidents.length > 0) {
-    // Already tracking this outage -- auto-resolving it after M consecutive
-    // `up` checks is Phase 5's next roadmap task, not this function opening
-    // a second, overlapping incident for the same ongoing streak.
+    // Already tracking this outage -- `maybeResolveIncident` is what closes
+    // it (after M consecutive `up` checks), not a second, overlapping
+    // incident opened here for the same ongoing streak.
     return { opened: false, reason: "already_open" };
   }
 
@@ -227,6 +267,106 @@ export async function maybeOpenIncidents(
   return Promise.all(
     entries.map((entry) =>
       maybeOpenIncident(supabase, entry.project_id, entry.status, threshold),
+    ),
+  );
+}
+
+/**
+ * Called once per project immediately after a check has just been
+ * persisted, same as `maybeOpenIncident` (and mutually exclusive with it in
+ * practice -- a given check's status is never both `up` and down/degraded).
+ * Only actually queries anything when `latestStatus` is `up`, and only
+ * proceeds to the recent-checks lookup if an incident is actually open for
+ * this project -- a healthy project with no incident (the common case)
+ * never pays for either round trip.
+ *
+ * A flapping project (up, down, up, down, ...) never accumulates
+ * `threshold` *consecutive* `up`s, so `meetsRecoveryThreshold` keeps
+ * returning false and the same incident row stays open across every one of
+ * those failures -- there is no separate "reset the counter" state to
+ * maintain here, since each call re-derives the streak fresh from the
+ * `checks` table itself.
+ */
+export async function maybeResolveIncident(
+  supabase: IncidentClient,
+  projectId: string,
+  latestStatus: string,
+  threshold: number = AUTO_RESOLVE_THRESHOLD,
+): Promise<ResolutionResult> {
+  if (latestStatus !== "up") {
+    return { resolved: false, reason: "not_recovering" };
+  }
+
+  const { data: openIncidents, error: openError } = await supabase
+    .from("incidents")
+    .select("id")
+    .eq("project_id", projectId)
+    .is("resolved_at", null)
+    .limit(1);
+
+  if (openError) {
+    console.error(
+      `[prober] incidents: failed to check for an open incident to resolve for project ${projectId}: ${openError.message}`,
+    );
+    return { resolved: false, reason: "error", error: openError.message };
+  }
+
+  const openIncident = openIncidents?.[0];
+  if (!openIncident) {
+    return { resolved: false, reason: "no_open_incident" };
+  }
+
+  const { data: recentChecks, error: checksError } = await supabase
+    .from("checks")
+    .select("status, checked_at, http_status, error_message, response_time_ms")
+    .eq("project_id", projectId)
+    .order("checked_at", { ascending: false })
+    .limit(threshold);
+
+  if (checksError) {
+    console.error(
+      `[prober] incidents: failed to read recent checks while resolving project ${projectId}: ${checksError.message}`,
+    );
+    return { resolved: false, reason: "error", error: checksError.message };
+  }
+
+  if (!meetsRecoveryThreshold(recentChecks ?? [], threshold)) {
+    return { resolved: false, reason: "below_threshold" };
+  }
+
+  // `recentChecks` is newest-first -- the newest of the `threshold` checks
+  // just confirmed as all-`up` *is* this call's own `latestStatus` check,
+  // i.e. the Mth consecutive success. That's the incident's end time (per
+  // this issue's own AC: set once the Mth check lands, not the first
+  // successful check after the failure).
+  const resolvedAt = recentChecks![0].checked_at;
+
+  const { error: updateError } = await supabase
+    .from("incidents")
+    .update({ resolved_at: resolvedAt })
+    .eq("id", openIncident.id);
+
+  if (updateError) {
+    console.error(
+      `[prober] incidents: failed to resolve incident ${openIncident.id} for project ${projectId}: ${updateError.message}`,
+    );
+    return { resolved: false, reason: "error", error: updateError.message };
+  }
+
+  return { resolved: true, incidentId: openIncident.id, resolvedAt };
+}
+
+/** Runs `maybeResolveIncident` for every classified-and-persisted result
+ * from one prober tick, concurrently -- same reasoning as
+ * `maybeOpenIncidents`. */
+export async function maybeResolveIncidents(
+  supabase: IncidentClient,
+  entries: Array<{ project_id: string; status: string }>,
+  threshold: number = AUTO_RESOLVE_THRESHOLD,
+): Promise<ResolutionResult[]> {
+  return Promise.all(
+    entries.map((entry) =>
+      maybeResolveIncident(supabase, entry.project_id, entry.status, threshold),
     ),
   );
 }

@@ -1,4 +1,5 @@
-// Prober Edge Function -- entry point (PRD §5.2, Phase 3, issues #20-#28).
+// Prober Edge Function -- entry point (PRD §5.2/§5.4, Phase 3/5, issues
+// #20-#28, #35-#36).
 //
 // Two request shapes, both POSTed here:
 //   `{}`                  -- the scheduled batch tick (pg_cron, every minute).
@@ -11,13 +12,14 @@
 // retrying per the project's own retry_count before finalizing a failure
 // (#21-#23, check.ts / retry.ts), classifies each final result into
 // up/down/degraded/waking/unknown (#24, classify.ts), writes one `checks`
-// row per project (#25, persist.ts), and records its own last-successful-
-// run timestamp for self-monitoring (#27, self-monitor.ts). A `pg_cron` job
-// fires this every minute (#26, see the schedule_prober_cron migration).
-// The full per-project outcome (raw + classified + persisted) is still
-// returned in the response too, so this stays testable/inspectable without
-// needing to separately query the `checks` table after every manual
-// invocation.
+// row per project (#25, persist.ts), opens/resolves `incidents` rows off the
+// resulting streaks (#35/#36, incidents.ts), and records its own last-
+// successful-run timestamp for self-monitoring (#27, self-monitor.ts). A
+// `pg_cron` job fires this every minute (#26, see the schedule_prober_cron
+// migration). The full per-project outcome (raw + classified + persisted +
+// incident) is still returned in the response too, so this stays testable/
+// inspectable without needing to separately query the `checks`/`incidents`
+// tables after every manual invocation.
 //
 // Manual path (#28): reuses the exact same check/retry/classify/persist
 // modules for one project id handed to it directly, instead of asking
@@ -65,7 +67,7 @@ import { writeCheckResults } from "./persist.ts";
 import { recordProberSuccess } from "./self-monitor.ts";
 import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { InsertableClient } from "./persist.ts";
-import { maybeOpenIncidents, type IncidentClient } from "./incidents.ts";
+import { maybeOpenIncidents, maybeResolveIncidents, type IncidentClient } from "./incidents.ts";
 
 /** Reads an optional `project_id` out of the request body. Malformed/empty
  * bodies (including pg_cron's literal `{}`) resolve to `null`, not a thrown
@@ -127,18 +129,26 @@ const prober = {
       const persisted = await writeCheckResults(ctx.supabaseAdmin, classified);
       const persistedById = new Map(persisted.map((p) => [p.project_id, p]));
 
-      // Incident detection (#35) only makes sense against a `checks` row
-      // that's actually on disk -- a project whose write just failed above
-      // is skipped here rather than evaluated against stale/missing data.
+      // Incident detection/resolution (#35/#36) only makes sense against a
+      // `checks` row that's actually on disk -- a project whose write just
+      // failed above is skipped here rather than evaluated against stale/
+      // missing data. `maybeOpenIncidents`/`maybeResolveIncidents` are each
+      // a no-op (no query at all) for a status the other one owns -- down/
+      // degraded only ever opens, up only ever resolves -- so running both
+      // over every entry is just as cheap as branching by status ourselves.
       const incidentInputs = classified
         .filter(({ result }) => persistedById.get(result.project_id)?.persisted)
         .map(({ result, status }) => ({ project_id: result.project_id, status }));
-      const incidents = await maybeOpenIncidents(
-        ctx.supabaseAdmin as unknown as IncidentClient,
-        incidentInputs,
-      );
+      const incidentClient = ctx.supabaseAdmin as unknown as IncidentClient;
+      const [opened, resolved] = await Promise.all([
+        maybeOpenIncidents(incidentClient, incidentInputs),
+        maybeResolveIncidents(incidentClient, incidentInputs),
+      ]);
       const incidentByProjectId = new Map(
-        incidentInputs.map((entry, index) => [entry.project_id, incidents[index]]),
+        incidentInputs.map((entry, index) => [
+          entry.project_id,
+          { opened: opened[index], resolved: resolved[index] },
+        ]),
       );
 
       // The pipeline ran to completion without throwing -- a genuine
