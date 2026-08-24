@@ -6,7 +6,7 @@
 // that same row rather than inserting a new one). Run with `deno test`
 // from this directory -- no Docker, no Supabase project, no network access
 // required.
-import { assertEquals, assertExists } from "jsr:@std/assert@1";
+import { assertEquals, assertExists } from "@std/assert";
 import {
   crossesEscalationThreshold,
   deriveIncidentCause,

@@ -74,7 +74,7 @@ export async function writeCheckResult(
  * consistent with how due projects are checked concurrently earlier in the
  * pipeline (#21).
  */
-export async function writeCheckResults(
+export function writeCheckResults(
   supabase: InsertableClient,
   entries: Array<{ result: CheckResult; status: CheckStatus }>,
 ): Promise<PersistResult[]> {

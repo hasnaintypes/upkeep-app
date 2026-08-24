@@ -2,7 +2,7 @@
 // unit-testable inputs/outputs... without hitting a real Edge Function
 // invocation"). Run with `deno test` from this directory -- no Docker, no
 // Supabase project, no network access required.
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "@std/assert";
 import { classifyCheck, type ClassifiableProject } from "./classify.ts";
 import type { CheckResult } from "./check.ts";
 

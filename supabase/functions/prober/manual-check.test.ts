@@ -1,7 +1,7 @@
 // Unit tests for manual-check.ts, using a fake combined lookup/insert client
 // and a stubbed global `fetch` -- no real Supabase project or network calls
 // needed.
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "@std/assert";
 import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { DueProject } from "./check.ts";
 import type { InsertableClient } from "./persist.ts";
@@ -116,18 +116,14 @@ Deno.test("runManualCheck: 500s when the lookup itself fails, never throws", asy
   // The lookup itself fails, so the pipeline never reaches persist.ts/
   // incidents.ts -- this fake only needs to satisfy the `projects` branch.
   const failingClient = {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    from: (table: string) => ({
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      select: (columns: string) => ({
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        eq: (column: string, value: string) => ({
+    from: (_table: string) => ({
+      select: (_columns: string) => ({
+        eq: (_column: string, _value: string) => ({
           maybeSingle: () =>
             Promise.resolve({ data: null, error: { message: "connection reset" } }),
         }),
       }),
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      insert: (values: Record<string, unknown>) => Promise.resolve({ error: null }),
+      insert: (_values: Record<string, unknown>) => Promise.resolve({ error: null }),
     }),
   } as unknown as FakeClient;
 

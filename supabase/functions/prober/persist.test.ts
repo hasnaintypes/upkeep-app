@@ -1,6 +1,6 @@
 // Unit tests for persist.ts, using a fake InsertableClient that records what
 // would have been inserted -- no real Supabase project needed.
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "@std/assert";
 import { writeCheckResult, type InsertableClient } from "./persist.ts";
 import type { CheckResult } from "./check.ts";
 
@@ -25,9 +25,8 @@ function fakeClient(): {
   return {
     inserted,
     client: {
-      // `table` must exist to satisfy InsertableClient's shape, unused here.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      from: (table: string) => ({
+      // `_table` must exist to satisfy InsertableClient's shape, unused here.
+      from: (_table: string) => ({
         insert: (values: Record<string, unknown>) => {
           inserted.push(values);
           return Promise.resolve({ error: null });
@@ -69,11 +68,9 @@ Deno.test("writeCheckResult: reports persisted=true on success", async () => {
 
 Deno.test("writeCheckResult: reports persisted=false and the error on failure, never throws", async () => {
   const failingClient: InsertableClient = {
-    // `table`/`values` must exist to satisfy InsertableClient's shape, unused here.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    from: (table: string) => ({
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      insert: (values: Record<string, unknown>) =>
+    // `_table`/`_values` must exist to satisfy InsertableClient's shape, unused here.
+    from: (_table: string) => ({
+      insert: (_values: Record<string, unknown>) =>
         Promise.resolve({ error: { message: "connection reset" } }),
     }),
   };

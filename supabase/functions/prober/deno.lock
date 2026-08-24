@@ -81,6 +81,7 @@
   },
   "workspace": {
     "dependencies": [
+      "jsr:@std/assert@1",
       "jsr:@supabase/functions-js@2",
       "npm:@supabase/server@1"
     ]

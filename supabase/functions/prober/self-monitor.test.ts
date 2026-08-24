@@ -1,6 +1,6 @@
 // Unit tests for self-monitor.ts, using a fake RpcClient -- no real Supabase
 // project needed.
-import { assertEquals } from "jsr:@std/assert@1";
+import { assertEquals } from "@std/assert";
 import { recordProberSuccess, type RpcClient } from "./self-monitor.ts";
 
 function fakeClient(): {

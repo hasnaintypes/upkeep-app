@@ -259,7 +259,7 @@ export async function maybeOpenIncident(
 /** Runs `maybeOpenIncident` for every classified-and-persisted result from
  * one prober tick, concurrently -- mirrors persist.ts's writeCheckResults'
  * own per-project-independent concurrency (#25). */
-export async function maybeOpenIncidents(
+export function maybeOpenIncidents(
   supabase: IncidentClient,
   entries: Array<{ project_id: string; status: string }>,
   threshold: number = ESCALATION_THRESHOLD,
@@ -359,7 +359,7 @@ export async function maybeResolveIncident(
 /** Runs `maybeResolveIncident` for every classified-and-persisted result
  * from one prober tick, concurrently -- same reasoning as
  * `maybeOpenIncidents`. */
-export async function maybeResolveIncidents(
+export function maybeResolveIncidents(
   supabase: IncidentClient,
   entries: Array<{ project_id: string; status: string }>,
   threshold: number = AUTO_RESOLVE_THRESHOLD,
