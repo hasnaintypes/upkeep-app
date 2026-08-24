@@ -168,8 +168,12 @@ function fakeClient(options: {
 
       throw new Error(`unexpected table: ${table}`);
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+    // The runtime dispatch on `table` above is exactly what IncidentClient's
+    // overloaded `from()` describes, but a single non-overloaded
+    // implementation can't be assigned directly to an overloaded type --
+    // `unknown` as an intermediate keeps this an explicit, narrow cast
+    // instead of reaching for `any`.
+  } as unknown as IncidentClient;
 
   return { client, inserted, updated };
 }
@@ -179,8 +183,7 @@ Deno.test("maybeOpenIncident: an up check never queries anything -- 'not_failing
     from() {
       throw new Error("should not be called for a healthy check");
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+  } as unknown as IncidentClient;
 
   const result = await maybeOpenIncident(throwingClient, "project-1", "up", 2);
   assertEquals(result, { opened: false, reason: "not_failing" });
@@ -243,8 +246,7 @@ Deno.test("maybeOpenIncident: surfaces (not throws) a checks-query error", async
       }
       throw new Error(`unexpected table: ${table}`);
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+  } as unknown as IncidentClient;
 
   const result = await maybeOpenIncident(client, "project-1", "down", 2);
   assertEquals(result.opened, false);
@@ -285,8 +287,7 @@ Deno.test("maybeResolveIncident: a down/degraded check never queries anything --
     from() {
       throw new Error("should not be called for a non-up check");
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+  } as unknown as IncidentClient;
 
   const result = await maybeResolveIncident(throwingClient, "project-1", "down", 2);
   assertEquals(result, { resolved: false, reason: "not_recovering" });
@@ -311,8 +312,7 @@ Deno.test("maybeResolveIncident: no open incident -> skips the checks lookup ent
       }
       throw new Error(`unexpected table: ${table}`);
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+  } as unknown as IncidentClient;
 
   const result = await maybeResolveIncident(client, "project-1", "up", 2);
   assertEquals(result, { resolved: false, reason: "no_open_incident" });
@@ -399,8 +399,7 @@ Deno.test("maybeResolveIncident: surfaces (not throws) an update error", async (
       }
       throw new Error(`unexpected table: ${table}`);
     },
-    // deno-lint-ignore no-explicit-any
-  } as any;
+  } as unknown as IncidentClient;
 
   const result = await maybeResolveIncident(client, "project-1", "up", 2);
   assertEquals(result.resolved, false);

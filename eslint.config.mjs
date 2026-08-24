@@ -11,6 +11,18 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    rules: {
+      // Matches the existing `_`-prefixed convention for intentionally
+      // unused parameters (e.g. fake Supabase clients in
+      // supabase/functions/prober/*.test.ts that must accept an argument
+      // to satisfy a structural type but don't need its value).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

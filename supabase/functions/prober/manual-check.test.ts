@@ -79,9 +79,14 @@ function fakeClient(project: DueProject | null): {
       }
 
       throw new Error(`unexpected table: ${table}`);
-      // deno-lint-ignore no-explicit-any
     },
-  } as any;
+    // The runtime dispatch on `table` above is exactly what the
+    // intersected ProjectLookupClient/InsertableClient/IncidentClient
+    // `from()` overloads describe, but a single non-overloaded
+    // implementation can't be assigned directly to an overloaded type --
+    // `unknown` as an intermediate keeps this an explicit, narrow cast
+    // instead of reaching for `any`.
+  } as unknown as FakeClient;
 
   return { client, inserted };
 }
@@ -124,8 +129,7 @@ Deno.test("runManualCheck: 500s when the lookup itself fails, never throws", asy
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       insert: (values: Record<string, unknown>) => Promise.resolve({ error: null }),
     }),
-    // deno-lint-ignore no-explicit-any
-  } as any as FakeClient;
+  } as unknown as FakeClient;
 
   const response = await runManualCheck(failingClient, "test-project");
   assertEquals(response.status, 500);
