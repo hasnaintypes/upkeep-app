@@ -11,11 +11,11 @@ import { Reveal } from "./reveal";
 
 export function FAQSection() {
   return (
-    <section className="py-16 md:py-24">
+    <section id="faq" className="py-24 lg:py-28">
       <div className="mx-auto max-w-5xl px-6">
         <div className="grid gap-8 md:grid-cols-5 md:gap-12">
           <Reveal className="md:col-span-2">
-            <h2 className="text-foreground text-4xl font-semibold">
+            <h2 className="text-foreground text-2xl font-semibold tracking-tight md:text-4xl lg:text-5xl">
               {FAQ_CONTENT.heading}
             </h2>
             <p className="text-muted-foreground mt-4 text-balance text-lg">
@@ -35,7 +35,7 @@ export function FAQSection() {
           </Reveal>
 
           <Reveal delay={100} className="md:col-span-3">
-            <Accordion type="single" collapsible>
+            <Accordion type="single" collapsible defaultValue={FAQ_ITEMS[0]?.id}>
               {FAQ_ITEMS.map((item) => (
                 <AccordionItem key={item.id} value={item.id}>
                   <AccordionTrigger className="cursor-pointer text-base hover:no-underline">

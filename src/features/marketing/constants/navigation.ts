@@ -6,6 +6,7 @@ export const GITHUB_URL = "https://github.com/hasnaintypes/upkeep-app";
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how-it-works" },
+  { label: "FAQ", href: "#faq" },
+  { label: "Docs", href: "/docs" },
   { label: "GitHub", href: GITHUB_URL },
 ];

@@ -98,7 +98,7 @@ Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 ## Styling
 
 - Tailwind CSS v4, CSS-first config — **no `tailwind.config.ts`** (deleted deliberately; don't recreate it). Theme tokens (OKLCH) live in the `@theme inline` block in `src/app/globals.css`. `components.json` has `"config": ""`.
-- Fonts: Geist Sans + Geist Mono via `next/font/google` in `src/app/layout.tsx`, wired as CSS variables (`--font-geist-sans` / `--font-geist-mono`) referenced from the `@theme` block. Apply via `.variable` + Tailwind's `font-sans`/`font-mono` utilities — don't switch back to `.className`.
+- Fonts: DM Sans (body/UI) + Geist Mono (code/tabular numbers) via `next/font/google` in `src/app/layout.tsx`, wired as CSS variables (`--font-dm-sans` / `--font-geist-mono`) referenced from the `@theme` block. Apply via `.variable` + Tailwind's `font-sans`/`font-mono` utilities — don't switch back to `.className`.
 - `framer-motion` is pinned at exact version `13.1.1` (no caret) — don't let a routine `pnpm update` silently bump it.
 - Animation utility classes (`animate-in`, `fade-in-0`, `zoom-in-95`, etc., used by `components/ui/dropdown-menu.tsx`) come from `tw-animate-css`, the Tailwind v4 equivalent of `tailwindcss-animate` (v3-only, don't reinstall it).
 

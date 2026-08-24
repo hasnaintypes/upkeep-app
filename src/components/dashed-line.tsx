@@ -1,0 +1,45 @@
+import { cn } from "@/lib/utils";
+
+interface DashedLineProps {
+  orientation?: "horizontal" | "vertical";
+  className?: string;
+}
+
+/**
+ * A repeating-dash divider (CSS gradient, not a border-dashed rule, so the
+ * dash length/gap is controllable) used as a section "topper" label rail
+ * and as a divider between cards. `currentColor`-based so it inherits
+ * whatever text color class the caller sets (defaults to muted-foreground).
+ */
+export function DashedLine({
+  orientation = "horizontal",
+  className,
+}: DashedLineProps) {
+  const isHorizontal = orientation === "horizontal";
+
+  return (
+    <div
+      className={cn(
+        "text-muted-foreground relative",
+        isHorizontal ? "h-px w-full" : "h-full w-px",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          isHorizontal
+            ? [
+                "h-px w-full",
+                "bg-[repeating-linear-gradient(90deg,transparent,transparent_4px,currentColor_4px,currentColor_10px)]",
+                "[mask-image:linear-gradient(90deg,transparent,black_25%,black_75%,transparent)]",
+              ]
+            : [
+                "h-full w-px",
+                "bg-[repeating-linear-gradient(180deg,transparent,transparent_4px,currentColor_4px,currentColor_10px)]",
+                "[mask-image:linear-gradient(180deg,transparent,black_25%,black_75%,transparent)]",
+              ],
+        )}
+      />
+    </div>
+  );
+}

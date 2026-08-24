@@ -1,31 +1,11 @@
 import Link from "next/link";
-import { Logo } from "@/components/logo";
-import { BRAND_NAME } from "@/features/marketing";
+import { Github } from "lucide-react";
+import { BRAND_NAME, GITHUB_URL } from "@/features/marketing";
+import { isExternalUrl } from "@/lib/utils";
 
-const links = [
-  {
-    group: "Product",
-    items: [
-      { title: "Features", href: "#features" },
-      { title: "How it works", href: "#how-it-works" },
-      { title: "Pricing", href: "#" },
-    ],
-  },
-  {
-    group: "Resources",
-    items: [
-      { title: "GitHub", href: "https://github.com/hasnaintypes/upkeep-app" },
-      { title: "Docs", href: "#" },
-      { title: "Support", href: "#" },
-    ],
-  },
-  {
-    group: "Legal",
-    items: [
-      { title: "Privacy", href: "#" },
-      { title: "Terms", href: "#" },
-    ],
-  },
+const LEGAL_LINKS = [
+  { title: "Privacy Policy", href: "#" },
+  { title: "Terms", href: "#" },
 ];
 
 async function getCurrentYear() {
@@ -33,40 +13,44 @@ async function getCurrentYear() {
   return new Date().getFullYear();
 }
 
+/**
+ * A minimal, single-row footer (copyright + legal/GitHub links) rather
+ * than a multi-column link grid -- matches this project's own scale (a
+ * personal, self-hosted tool, not an org with Company/Careers/Changelog
+ * pages to list). The GitHub icon is the only social link here -- no
+ * Instagram/X/LinkedIn placeholders for accounts that don't exist.
+ */
 export async function SiteFooter() {
   const year = await getCurrentYear();
 
   return (
-    <footer className="bg-background border-b pt-20">
-      <div className="mx-auto max-w-5xl px-6">
-        <div className="grid gap-12 md:grid-cols-5">
-          <div className="md:col-span-2">
-            <Link href="/" aria-label="go home" className="block size-fit">
-              <Logo />
+    <footer className="bg-muted/50">
+      <div className="mx-auto max-w-5xl px-6 py-8 text-center">
+        <div className="flex w-full flex-col-reverse items-center justify-between gap-4 text-sm sm:flex-row">
+          <p className="text-muted-foreground">
+            © {year} {BRAND_NAME} — self-hosted uptime for side projects.
+          </p>
+
+          <div className="flex items-center gap-6">
+            {LEGAL_LINKS.map((link) => (
+              <Link
+                key={link.title}
+                href={link.href}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {link.title}
+              </Link>
+            ))}
+            <Link
+              href={GITHUB_URL}
+              target={isExternalUrl(GITHUB_URL) ? "_blank" : undefined}
+              rel={isExternalUrl(GITHUB_URL) ? "noreferrer" : undefined}
+              aria-label="GitHub"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Github className="size-5" />
             </Link>
           </div>
-
-          <div className="col-span-3 grid grid-cols-3 gap-6">
-            {links.map((link) => (
-              <div key={link.group} className="space-y-4">
-                <span className="block font-medium">{link.group}</span>
-                {link.items.map((item) => (
-                  <Link
-                    key={item.title}
-                    href={item.href}
-                    className="text-muted-foreground hover:text-primary block duration-150"
-                  >
-                    <span>{item.title}</span>
-                  </Link>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-12 flex flex-wrap items-end justify-between gap-6 border-t py-6">
-          <span className="text-muted-foreground order-last block text-center text-sm md:order-first">
-            © {year} {BRAND_NAME}, all rights reserved
-          </span>
         </div>
       </div>
     </footer>

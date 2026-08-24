@@ -1,30 +1,58 @@
-import type { HowItWorksStep } from "../types";
+import type { ContentRow, HowItWorksStep } from "../types";
 
 export const HOW_IT_WORKS_CONTENT = {
-  heading: "From registered URL to live status in four steps",
-  description:
-    "No agent to install on your projects - just a health endpoint and a schedule.",
+  eyebrow: "How it works",
+  headingLead: "Upkeep, as your",
+  headingHighlight: "uptime watchdog",
+  headingRest:
+    ", pings every project's health endpoint on its own schedule, classifies what it finds, and alerts you the moment something changes.",
+  primaryCta: "Get started free",
+  secondaryCta: "View on GitHub",
+  stepsEyebrow: "Step by step",
 };
+
+/** The compact 2x2 capability grid next to the intro copy -- the same
+ * real facts used elsewhere on this page (checks, classification,
+ * notification channels, self-hosting cost), just condensed to one line
+ * each for this layout. */
+export const HOW_IT_WORKS_CAPABILITIES: [ContentRow, ContentRow, ContentRow, ContentRow] = [
+  {
+    title: "Flexible checks",
+    description: "Method, interval, timeout, and retries - configurable per project.",
+  },
+  {
+    title: "Smart classification",
+    description: "Every ping sorted into up, degraded, waking, down, or unknown.",
+  },
+  {
+    title: "Multi-channel alerts",
+    description: "Discord, Telegram, email, or a webhook - fired on status change only.",
+  },
+  {
+    title: "Self-hosted & free",
+    description: "Runs on your own Supabase project, comfortably within the free tier.",
+  },
+];
 
 export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     title: "Register a project",
     description:
-      "Add a name, health check URL, expected status code, and check interval - or self-register it via the API at deploy time.",
+      "Add your project's health-check URL and pick the hosting provider it runs on.",
   },
   {
-    title: "Upkeep pings on schedule",
+    title: "Configure checks",
     description:
-      "A scheduled prober checks each project on its own interval, classifies the result as up, down, degraded, or waking, and retries before marking it down.",
+      "Set the method, interval, timeout, and retry threshold - or just use sensible defaults.",
   },
   {
-    title: "Get notified on status change",
+    title: "Upkeep keeps watch",
     description:
-      "Alerts fire only when a project's status actually changes - Discord, Telegram, email, or a webhook of your choice.",
+      "Every check is classified as up, degraded, waking, down, or unknown, and consecutive failures are grouped into one incident.",
   },
   {
-    title: "Track history on one dashboard",
+    title: "Get notified",
     description:
-      "Rolling uptime percentages, response-time trends, and grouped incident history for every project.",
+      "Discord, Telegram, email, or a webhook - fired only when a project's status actually changes.",
   },
 ];

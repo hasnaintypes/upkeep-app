@@ -1,54 +1,67 @@
-"use client";
-
-import { cn } from "@/lib/utils";
-import { Calendar1 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Reveal } from "./reveal";
+import Link from "next/link";
 import {
-  CODE_ILLUSTRATION_CONTENT,
-  FEATURE_CARDS,
-  FEATURES_CONTENT,
-  SCHEDULE_ILLUSTRATION_CONTENT,
-} from "../constants/features";
+  Activity,
+  ArrowRight,
+  Layers,
+  LayoutDashboard,
+  SlidersHorizontal,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AUTH_ROUTES } from "@/features/auth/constants/routes";
+import { CTA_CONTENT } from "../constants/cta";
+import { FEATURE_CARDS, FEATURES_CONTENT } from "../constants/features";
+import type { FeatureCard as FeatureCardData, FeatureIcon } from "../types";
+import { Reveal } from "./reveal";
+
+const ICONS: Record<FeatureIcon, LucideIcon> = {
+  checks: SlidersHorizontal,
+  status: Activity,
+  dashboard: LayoutDashboard,
+  speed: Zap,
+};
 
 export function FeaturesSection() {
   return (
-    <section id="features">
-      <div className="py-24">
-        <div className="mx-auto w-full max-w-5xl px-6">
-          <Reveal>
-            <h2 className="text-foreground mt-4 text-4xl font-semibold">
-              {FEATURES_CONTENT.heading}
-            </h2>
-            <p className="text-muted-foreground mb-12 mt-4 text-balance text-lg">
-              {FEATURES_CONTENT.description}
-            </p>
-          </Reveal>
+    <section id="features" className="py-24 lg:py-28">
+      <div className="mx-auto w-full max-w-7xl px-6">
+        <Reveal>
+          <div className="flex w-fit flex-col gap-2 border-b pb-2">
+            <span className="text-foreground flex items-center gap-2 text-sm font-medium">
+              <Layers className="size-4" />
+              {FEATURES_CONTENT.eyebrow}
+            </span>
+          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid gap-8 lg:grid-cols-2 lg:gap-16">
+            <h2 className="text-foreground text-4xl leading-[1.1] font-semibold tracking-tight text-balance md:text-5xl lg:text-6xl">
+              {FEATURES_CONTENT.headingLead}
+              <br />
+              {FEATURES_CONTENT.headingRest}
+            </h2>
+
+            <div className="flex flex-col items-start gap-6 lg:pt-2">
+              <p className="text-muted-foreground text-lg text-balance">
+                {FEATURES_CONTENT.description}
+              </p>
+              <Button variant="outline" asChild>
+                <Link href={AUTH_ROUTES.signUp}>{CTA_CONTENT.primaryCta}</Link>
+              </Button>
+            </div>
+          </div>
+        </Reveal>
+
+        <div className="relative mt-16 lg:mt-20">
+          <div
+            aria-hidden
+            className="bg-foreground/5 pointer-events-none absolute inset-x-6 bottom-0 -z-10 h-2/3 rounded-full blur-3xl"
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURE_CARDS.map((card, index) => (
               <Reveal key={card.title} delay={index * 100}>
-                <Card
-                  variant="soft"
-                  className="h-full p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-                >
-                  <div className="flex aspect-video items-center justify-center">
-                    {card.illustration === "code" ? (
-                      <CodeIllustration className="w-full" />
-                    ) : (
-                      <ScheduleIllustration className="border" />
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <h3 className="text-foreground text-xl font-semibold">
-                      {card.title}
-                    </h3>
-                    <p className="text-muted-foreground mt-4 text-balance text-lg">
-                      {card.description}
-                    </p>
-                  </div>
-                </Card>
+                <FeatureCardItem card={card} />
               </Reveal>
             ))}
           </div>
@@ -58,72 +71,24 @@ export function FeaturesSection() {
   );
 }
 
-type IllustrationProps = {
-  className?: string;
-  variant?: "elevated" | "outlined" | "mixed";
-};
+function FeatureCardItem({ card }: { card: FeatureCardData }) {
+  const Icon = ICONS[card.icon];
 
-export const ScheduleIllustration = ({
-  className,
-  variant = "elevated",
-}: IllustrationProps) => {
   return (
-    <div className={cn("relative", className)}>
-      <div
-        className={cn(
-          "bg-background -translate-x-1/8 absolute flex translate-y-[-110%] items-center gap-2 rounded-lg p-1",
-          {
-            "shadow-black-950/10 shadow-lg": variant === "elevated",
-            "border-foreground/10 border": variant === "outlined",
-            "border-foreground/10 border shadow-md shadow-black/5":
-              variant === "mixed",
-          },
-        )}
-      >
-        <Button size="sm" className="rounded-sm">
-          <Calendar1 className="size-3" />
-          <span className="text-sm font-medium">
-            {SCHEDULE_ILLUSTRATION_CONTENT.toolbarLabel}
-          </span>
-        </Button>
+    <div className="border-border bg-card relative flex h-full flex-col justify-between gap-8 rounded-2xl border p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <h3 className="text-foreground max-w-40 text-2xl leading-tight font-semibold text-balance">
+          {card.title}
+        </h3>
+        <Icon className="text-muted-foreground size-6 shrink-0" />
       </div>
-      <span>
-        <span className="bg-secondary text-secondary-foreground py-1">
-          {SCHEDULE_ILLUSTRATION_CONTENT.highlight}
-        </span>{" "}
-        {SCHEDULE_ILLUSTRATION_CONTENT.suffix}
-      </span>
-    </div>
-  );
-};
 
-export const CodeIllustration = ({ className }: { className?: string }) => {
-  return (
-    <div
-      className={cn(
-        "mask-[radial-gradient(ellipse_50%_50%_at_50%_50%,#000_50%,transparent_100%)]",
-        className,
-      )}
-    >
-      <ul className="text-muted-foreground mx-auto w-fit font-mono text-2xl font-medium">
-        {CODE_ILLUSTRATION_CONTENT.items.map((item, index) => (
-          <li
-            key={item}
-            className={cn(
-              "relative",
-              index === CODE_ILLUSTRATION_CONTENT.highlightedIndex &&
-                "text-foreground",
-            )}
-          >
-            {index === CODE_ILLUSTRATION_CONTENT.highlightedIndex && (
-              <span className="absolute -translate-x-[110%] text-orange-500">
-                {CODE_ILLUSTRATION_CONTENT.highlightedTag}
-              </span>
-            )}
-            {item}
-          </li>
-        ))}
-      </ul>
+      <div className="flex flex-1 items-end justify-between gap-4">
+        <p className="text-muted-foreground text-sm text-balance">
+          {card.description}
+        </p>
+        <ArrowRight className="text-foreground size-5 shrink-0" />
+      </div>
     </div>
   );
-};
+}

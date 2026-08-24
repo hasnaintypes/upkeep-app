@@ -1,23 +1,25 @@
 import {
   CTASection,
   ContentSection,
+  CoreFeaturesSection,
   FAQSection,
   FeaturesSection,
   HeroSection,
   HowItWorksSection,
-  IntegrationsSection,
+  SupportedHostsSection,
 } from "@/features/marketing";
 
 export default function Home() {
   return (
     <>
       <HeroSection />
-      {/* <FeaturesSection />
+      <SupportedHostsSection />
       <HowItWorksSection />
+      <CoreFeaturesSection />
+      <FeaturesSection />
       <ContentSection />
-      <IntegrationsSection />
       <FAQSection />
-      <CTASection /> */}
+      <CTASection />
     </>
   );
 }
