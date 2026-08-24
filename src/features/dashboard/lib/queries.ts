@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { CHECK_LOG_PAGE_SIZE, INCIDENT_LIST_LIMIT } from "../constants";
+import { CHECK_LOG_PAGE_SIZE, INCIDENT_PAGE_SIZE } from "../constants";
 import type {
   CheckLogCursor,
   CheckLogPage,
   CheckLogRow,
   DailyHistoryPoint,
   Incident,
+  IncidentCursor,
+  IncidentPage,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
   ResponseTimeSeries,
@@ -231,28 +233,83 @@ export async function getProjectChecksPage(
   };
 }
 
+const INCIDENT_COLUMNS = "id, project_id, started_at, resolved_at, cause, notified";
+
 /**
- * A project's most recent incidents, newest-first (PRD §5.4, Phase 5, #37).
- * Deliberately just a flat, unpaginated `limit()` for now -- a real
- * paginated/sortable incident history view is #38's own scope, not this
- * one; this exists so #37's manual-annotation UI has *something* to
- * annotate. Relies on `incidents_select_own` RLS for scoping, same
+ * One page of a project's incident history, newest-first (PRD §5.4, Phase
+ * 5, #38). Keyset (cursor) pagination on `started_at` -- same structure as
+ * `getProjectChecksPage` (#32): every query here is a `project_id`
+ * equality + a `started_at` range/order, which
+ * `incidents_project_id_started_at_idx (project_id, started_at desc)`
+ * (already created alongside the table, Phase 5) serves directly regardless
+ * of how deep a caller paginates. `hasNext`/`hasPrevious` are the same
+ * two-`limit(1)`-existence-check approach for the same reason (correct
+ * regardless of navigation history, independent of the page's own row
+ * count). Relies on `incidents_select_own` RLS for scoping, same
  * "don't re-check ownership here" convention as every other query in this
  * module.
  */
-export async function getProjectIncidents(
+export async function getProjectIncidentsPage(
   projectId: string,
-): Promise<{ data: Incident[] | null; error: string | null }> {
+  cursor?: IncidentCursor,
+): Promise<{ data: IncidentPage | null; error: string | null }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("incidents")
-    .select("id, project_id, started_at, resolved_at, cause, notified")
-    .eq("project_id", projectId)
-    .order("started_at", { ascending: false })
-    .limit(INCIDENT_LIST_LIMIT);
+
+  let pageQuery = supabase.from("incidents").select(INCIDENT_COLUMNS).eq("project_id", projectId);
+
+  if (cursor?.direction === "next") {
+    pageQuery = pageQuery.lt("started_at", cursor.startedAt).order("started_at", {
+      ascending: false,
+    });
+  } else if (cursor?.direction === "previous") {
+    pageQuery = pageQuery.gt("started_at", cursor.startedAt).order("started_at", {
+      ascending: true,
+    });
+  } else {
+    pageQuery = pageQuery.order("started_at", { ascending: false });
+  }
+
+  const { data, error } = await pageQuery.limit(INCIDENT_PAGE_SIZE);
 
   if (error) {
     return { data: null, error: error.message };
   }
-  return { data, error: null };
+
+  // "previous" fetches ascending (closest-to-cursor first) so the LIMIT
+  // keeps the rows nearest the cursor -- flip back to newest-first for display.
+  const rows = (cursor?.direction === "previous" ? [...data].reverse() : data) as Incident[];
+
+  if (rows.length === 0) {
+    return { data: { rows: [], hasNext: false, hasPrevious: false }, error: null };
+  }
+
+  const newest = rows[0].started_at;
+  const oldest = rows[rows.length - 1].started_at;
+
+  const [{ count: olderCount, error: olderError }, { count: newerCount, error: newerError }] =
+    await Promise.all([
+      supabase
+        .from("incidents")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .lt("started_at", oldest),
+      supabase
+        .from("incidents")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId)
+        .gt("started_at", newest),
+    ]);
+
+  if (olderError || newerError) {
+    return { data: null, error: (olderError ?? newerError)!.message };
+  }
+
+  return {
+    data: {
+      rows,
+      hasNext: (olderCount ?? 0) > 0,
+      hasPrevious: (newerCount ?? 0) > 0,
+    },
+    error: null,
+  };
 }

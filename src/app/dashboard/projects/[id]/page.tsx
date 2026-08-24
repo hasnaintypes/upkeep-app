@@ -10,20 +10,25 @@ import {
   CheckLogTable,
   getProjectChecksPage,
   getProjectDailyHistory,
-  getProjectIncidents,
+  getProjectIncidentsPage,
   getProjectUptimeSummaries,
   getResponseTimeSeries,
-  IncidentsList,
+  IncidentHistoryTable,
   ResponseTimeSection,
   StatusBadge,
   UptimeHeatmap,
   UPTIME_WINDOWS,
 } from "@/features/dashboard";
-import type { CheckLogCursor, ResponseTimeSeries, UptimeWindowKey } from "@/features/dashboard";
+import type {
+  CheckLogCursor,
+  IncidentCursor,
+  ResponseTimeSeries,
+  UptimeWindowKey,
+} from "@/features/dashboard";
 
 /**
  * Per-project detail page (PRD §5.6, Phase 4/5): response-time graph (#30),
- * uptime heatmap/timeline (#31), incident list (#37), and raw check log
+ * uptime heatmap/timeline (#31), incident history (#38), and raw check log
  * (#32) -- matching the PRD's own ordering for this page.
  */
 async function ProjectDetailLoader({
@@ -31,7 +36,12 @@ async function ProjectDetailLoader({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cursor?: string; dir?: string }>;
+  searchParams: Promise<{
+    cursor?: string;
+    dir?: string;
+    incidentCursor?: string;
+    incidentDir?: string;
+  }>;
 }) {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
@@ -41,10 +51,14 @@ async function ProjectDetailLoader({
   }
 
   const { id } = await params;
-  const { cursor, dir } = await searchParams;
+  const { cursor, dir, incidentCursor, incidentDir } = await searchParams;
   const checksCursor: CheckLogCursor | undefined =
     cursor && (dir === "next" || dir === "previous")
       ? { checkedAt: cursor, direction: dir }
+      : undefined;
+  const incidentsCursor: IncidentCursor | undefined =
+    incidentCursor && (incidentDir === "next" || incidentDir === "previous")
+      ? { startedAt: incidentCursor, direction: incidentDir }
       : undefined;
 
   const [{ data: project, error: projectError }, { data: summaries }] = await Promise.all([
@@ -73,7 +87,7 @@ async function ProjectDetailLoader({
       }),
     ),
     getProjectDailyHistory(project.id),
-    getProjectIncidents(project.id),
+    getProjectIncidentsPage(project.id, incidentsCursor),
     getProjectChecksPage(project.id, checksCursor),
   ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
@@ -116,7 +130,10 @@ async function ProjectDetailLoader({
       {incidentsError ? (
         <p className="text-sm text-destructive">Failed to load incidents: {incidentsError}</p>
       ) : (
-        <IncidentsList initialIncidents={incidents ?? []} />
+        <IncidentHistoryTable
+          projectId={project.id}
+          page={incidents ?? { rows: [], hasNext: false, hasPrevious: false }}
+        />
       )}
 
       {checksError ? (
@@ -145,7 +162,12 @@ export default function ProjectDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cursor?: string; dir?: string }>;
+  searchParams: Promise<{
+    cursor?: string;
+    dir?: string;
+    incidentCursor?: string;
+    incidentDir?: string;
+  }>;
 }) {
   return (
     <Suspense fallback={<ProjectDetailSkeleton />}>

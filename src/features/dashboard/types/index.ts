@@ -151,3 +151,24 @@ export type Incident = {
 export type IncidentActionResult =
   | { data: Incident; error: null }
   | { data: null; error: string };
+
+/**
+ * One page of a project's incident history, keyset-paginated by
+ * `started_at` (PRD §5.4, Phase 5, #38) -- same reasoning as `CheckLogPage`:
+ * a single indexed range scan on `incidents_project_id_started_at_idx
+ * (project_id, started_at desc)` regardless of how deep a caller paginates,
+ * not an `OFFSET` scan that gets slower the further in you go.
+ */
+export type IncidentPage = {
+  rows: Incident[];
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
+/** Which direction to paginate from a given `started_at` cursor -- "next"
+ * means older incidents (further down the history), "previous" means more
+ * recent ones (back toward the top). Mirrors `CheckLogCursor`. */
+export type IncidentCursor = {
+  startedAt: string;
+  direction: "next" | "previous";
+};
