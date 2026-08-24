@@ -68,3 +68,10 @@ export const HEATMAP_CELL_COLOR = {
 
 /** Rows per page for the raw check log table (PRD §5.6, Phase 4, #32). */
 export const CHECK_LOG_PAGE_SIZE = 25;
+
+/** How many of a project's most recent incidents the detail page shows
+ * (PRD §5.4, Phase 5, #37) -- a flat cap, not real pagination (#38 builds
+ * the actual paginated/sortable incident history view). Generous enough
+ * that it won't realistically need paginating for a single project at
+ * this app's scale (PRD §9, ~50 projects total) before #38 replaces it. */
+export const INCIDENT_LIST_LIMIT = 20;

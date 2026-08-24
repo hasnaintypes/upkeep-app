@@ -10,8 +10,10 @@ import {
   CheckLogTable,
   getProjectChecksPage,
   getProjectDailyHistory,
+  getProjectIncidents,
   getProjectUptimeSummaries,
   getResponseTimeSeries,
+  IncidentsList,
   ResponseTimeSection,
   StatusBadge,
   UptimeHeatmap,
@@ -20,8 +22,9 @@ import {
 import type { CheckLogCursor, ResponseTimeSeries, UptimeWindowKey } from "@/features/dashboard";
 
 /**
- * Per-project detail page (PRD §5.6, Phase 4): response-time graph (#30),
- * uptime heatmap/timeline (#31), and raw check log (#32).
+ * Per-project detail page (PRD §5.6, Phase 4/5): response-time graph (#30),
+ * uptime heatmap/timeline (#31), incident list (#37), and raw check log
+ * (#32) -- matching the PRD's own ordering for this page.
  */
 async function ProjectDetailLoader({
   params,
@@ -60,6 +63,7 @@ async function ProjectDetailLoader({
   const [
     seriesEntries,
     { data: dailyHistory, error: historyError },
+    { data: incidents, error: incidentsError },
     { data: checksPage, error: checksError },
   ] = await Promise.all([
     Promise.all(
@@ -69,6 +73,7 @@ async function ProjectDetailLoader({
       }),
     ),
     getProjectDailyHistory(project.id),
+    getProjectIncidents(project.id),
     getProjectChecksPage(project.id, checksCursor),
   ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
@@ -106,6 +111,12 @@ async function ProjectDetailLoader({
         </p>
       ) : (
         <UptimeHeatmap history={dailyHistory ?? []} />
+      )}
+
+      {incidentsError ? (
+        <p className="text-sm text-destructive">Failed to load incidents: {incidentsError}</p>
+      ) : (
+        <IncidentsList initialIncidents={incidents ?? []} />
       )}
 
       {checksError ? (

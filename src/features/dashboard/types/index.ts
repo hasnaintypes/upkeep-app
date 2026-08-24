@@ -129,3 +129,25 @@ export type CheckLogCursor = {
   checkedAt: string;
   direction: "next" | "previous";
 };
+
+/**
+ * One `incidents` row (PRD §6/§5.4, Phase 5, #35-#37): auto-detected by the
+ * prober (started_at/cause on open, resolved_at on auto-resolve -- see
+ * supabase/functions/prober/incidents.ts), with `cause` also the target of
+ * manual annotation (#37) -- the same column serves both purposes per the
+ * PRD's own schema note ("nullable, auto or manually annotated"), not a
+ * separate notes field. An incident is "open" iff `resolved_at` is null.
+ */
+export type Incident = {
+  id: string;
+  project_id: string;
+  started_at: string;
+  resolved_at: string | null;
+  cause: string | null;
+  notified: boolean;
+};
+
+/** Result of `updateIncidentCause` (lib/actions.ts, #37). */
+export type IncidentActionResult =
+  | { data: Incident; error: null }
+  | { data: null; error: string };

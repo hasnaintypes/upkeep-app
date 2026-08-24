@@ -12,8 +12,10 @@ export { ResponseTimeSection } from "./components/response-time-section";
 export { UptimeHeatmap } from "./components/uptime-heatmap";
 export { CheckLogTable } from "./components/check-log-table";
 export { OverviewFilterBar } from "./components/overview-filters";
+export { IncidentsList } from "./components/incidents-list";
 
 export * from "./constants";
+export * from "./lib/actions";
 export * from "./lib/queries";
 export * from "./lib/filters";
 export * from "./types";

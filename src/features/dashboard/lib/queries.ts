@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { CHECK_LOG_PAGE_SIZE } from "../constants";
+import { CHECK_LOG_PAGE_SIZE, INCIDENT_LIST_LIMIT } from "../constants";
 import type {
   CheckLogCursor,
   CheckLogPage,
   CheckLogRow,
   DailyHistoryPoint,
+  Incident,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
   ResponseTimeSeries,
@@ -228,4 +229,30 @@ export async function getProjectChecksPage(
     },
     error: null,
   };
+}
+
+/**
+ * A project's most recent incidents, newest-first (PRD §5.4, Phase 5, #37).
+ * Deliberately just a flat, unpaginated `limit()` for now -- a real
+ * paginated/sortable incident history view is #38's own scope, not this
+ * one; this exists so #37's manual-annotation UI has *something* to
+ * annotate. Relies on `incidents_select_own` RLS for scoping, same
+ * "don't re-check ownership here" convention as every other query in this
+ * module.
+ */
+export async function getProjectIncidents(
+  projectId: string,
+): Promise<{ data: Incident[] | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("incidents")
+    .select("id, project_id, started_at, resolved_at, cause, notified")
+    .eq("project_id", projectId)
+    .order("started_at", { ascending: false })
+    .limit(INCIDENT_LIST_LIMIT);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data, error: null };
 }
