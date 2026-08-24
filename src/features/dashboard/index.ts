@@ -13,9 +13,12 @@ export { UptimeHeatmap } from "./components/uptime-heatmap";
 export { CheckLogTable } from "./components/check-log-table";
 export { OverviewFilterBar } from "./components/overview-filters";
 export { IncidentHistoryTable } from "./components/incident-history-table";
+export { IncidentFilterBar } from "./components/incident-filter-bar";
+export { GlobalIncidentTable } from "./components/global-incident-table";
 
 export * from "./constants";
 export * from "./lib/actions";
 export * from "./lib/queries";
 export * from "./lib/filters";
+export * from "./lib/incident-filters";
 export * from "./types";

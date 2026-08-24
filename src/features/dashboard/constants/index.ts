@@ -1,6 +1,6 @@
 import { CheckCircle2, CircleHelp, Sunrise, TriangleAlert, XCircle } from "lucide-react";
 import type { CheckStatus } from "@/features/projects";
-import type { UptimeWindowKey } from "../types";
+import type { IncidentTimeRangeKey, UptimeWindowKey } from "../types";
 
 /**
  * Display metadata for each of the five check statuses (PRD §5.2), used by
@@ -78,3 +78,13 @@ export const INCIDENT_PAGE_SIZE = 20;
  * need a per-second tick; 30s keeps it visibly "live" without churning the
  * row needlessly. */
 export const INCIDENT_LIVE_DURATION_TICK_MS = 30_000;
+
+/** Ordered options for the global incident view's time-range filter select
+ * (PRD §5.4, Phase 5, #39) -- same four windows as `UPTIME_WINDOWS` but a
+ * distinct list (see `IncidentTimeRangeKey`'s own doc comment for why). */
+export const INCIDENT_TIME_RANGE_OPTIONS: { key: IncidentTimeRangeKey; label: string }[] = [
+  { key: "24h", label: "Last 24 hours" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+];

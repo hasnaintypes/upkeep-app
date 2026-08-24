@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CirclePower, FolderIcon, LayoutDashboardIcon } from "lucide-react";
+import { CirclePower, FolderIcon, LayoutDashboardIcon, SirenIcon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,13 +18,14 @@ import { NavMain, type NavMainItem } from "./nav-main";
 const NAV_MAIN_ITEMS: NavMainItem[] = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Projects", url: "/dashboard/projects", icon: FolderIcon },
+  { title: "Incidents", url: "/dashboard/incidents", icon: SirenIcon },
 ];
 
 /**
  * Dashboard sidebar shell (adapted from shadcn's dashboard-01 block, see
  * https://ui.shadcn.com/blocks -- installed via `pnpm dlx shadcn add
  * sidebar avatar dropdown-menu`, this component itself hand-written to
- * replace the block's own app-sidebar.tsx). Two real nav items instead of
+ * replace the block's own app-sidebar.tsx). Real nav items instead of
  * the block's five fake ones (Dashboard/Lifecycle/Analytics/Projects/Team,
  * all `url: "#"`), and no `NavDocuments`/`NavSecondary` sections -- this
  * app has no documents library or settings/help pages yet, so those

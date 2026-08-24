@@ -172,3 +172,43 @@ export type IncidentCursor = {
   startedAt: string;
   direction: "next" | "previous";
 };
+
+/** Filter facets for the global (all-projects) incident history view (PRD
+ * §5.4, Phase 5, #39). `status` is a coarse open/resolved split (not the
+ * five-way `CheckStatus` -- an incident itself only has two states, see
+ * `Incident`'s own doc comment), and `since` is a single-select time-range
+ * cutoff, distinct in kind from the multi-select facets on the overview
+ * page's `OverviewFilters` (#33) -- project/status/time-range are each
+ * naturally one-at-a-time here, not a set of chips to toggle in/out. */
+export type IncidentStatusFilter = "open" | "resolved";
+
+/** Deliberately its own type, not a reuse of dashboard's `UptimeWindowKey`
+ * -- same four labels, but a genuinely different concept (a filter cutoff
+ * on `incidents.started_at`, not a rolling-uptime-% aggregation window). */
+export type IncidentTimeRangeKey = "24h" | "7d" | "30d" | "90d";
+
+export type GlobalIncidentFilters = {
+  projectId: string | null;
+  status: IncidentStatusFilter | null;
+  since: IncidentTimeRangeKey | null;
+};
+
+export type GlobalIncidentSearchParams = {
+  project?: string;
+  status?: string;
+  since?: string;
+  cursor?: string;
+  dir?: string;
+};
+
+/** One incident row for the global view, widened with the owning project's
+ * name (PRD §5.4, #39's "each row identifies which project the incident
+ * belongs to" acceptance criterion) -- the per-project view (#38) doesn't
+ * need this since it's already scoped to one project. */
+export type GlobalIncidentRow = Incident & { project_name: string };
+
+export type GlobalIncidentPage = {
+  rows: GlobalIncidentRow[];
+  hasNext: boolean;
+  hasPrevious: boolean;
+};

@@ -5,9 +5,13 @@ import type {
   CheckLogPage,
   CheckLogRow,
   DailyHistoryPoint,
+  GlobalIncidentFilters,
+  GlobalIncidentPage,
+  GlobalIncidentRow,
   Incident,
   IncidentCursor,
   IncidentPage,
+  IncidentTimeRangeKey,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
   ResponseTimeSeries,
@@ -309,6 +313,145 @@ export async function getProjectIncidentsPage(
       rows,
       hasNext: (olderCount ?? 0) > 0,
       hasPrevious: (newerCount ?? 0) > 0,
+    },
+    error: null,
+  };
+}
+
+const GLOBAL_INCIDENT_COLUMNS =
+  "id, project_id, started_at, resolved_at, cause, notified, projects(name)";
+
+/** Same four windows/hour-counts as `WINDOW_HOURS` above, but kept as its
+ * own map -- `IncidentTimeRangeKey` is a distinct type from
+ * `UptimeWindowKey` (see its own doc comment in types/index.ts), and this
+ * query filters `incidents.started_at`, not a rolling-uptime aggregation. */
+const INCIDENT_TIME_RANGE_HOURS: Record<IncidentTimeRangeKey, number> = {
+  "24h": 24,
+  "7d": 24 * 7,
+  "30d": 24 * 30,
+  "90d": 24 * 90,
+};
+
+/** One row of `getIncidentsPage`'s raw Supabase result -- the embedded
+ * `projects(name)` relationship (via `incidents_project_id_fkey`) comes
+ * back nested rather than flattened. */
+type RawGlobalIncidentRow = Incident & { projects: { name: string } | null };
+
+/**
+ * One page of incidents across *every* project the signed-in user owns
+ * (PRD §5.4, Phase 5, #39) -- the global counterpart to #38's
+ * `getProjectIncidentsPage`, same keyset pagination on `started_at`
+ * (served by the dedicated `incidents_started_at_idx` added alongside this
+ * query, since there's no `project_id` predicate to make the per-project
+ * composite index useful here) plus optional project/status/time-range
+ * filters applied as real SQL predicates -- not in-memory like the
+ * overview page's `filterOverviewRows` (#33), since unlike that already
+ * fully-fetched, bounded (~50 project) list, this dataset can grow
+ * unboundedly and is itself paginated.
+ *
+ * Uses every one of the user's projects (`getProjects`, not
+ * `getActiveProjects`) as the project-filter's own option set at the call
+ * site -- a paused project's *past* incidents are still real history, and
+ * the issue's own acceptance criterion says "every project the signed-in
+ * user owns," not "every active project" (a deliberate difference from the
+ * overview page's #29 scope, flagged here rather than assumed).
+ *
+ * Relies entirely on `incidents_select_own` RLS for scoping -- no
+ * `project_id` filter of its own means this can safely omit any manual
+ * ownership check and still only ever return the caller's own incidents.
+ */
+export async function getIncidentsPage(
+  filters: GlobalIncidentFilters,
+  cursor?: IncidentCursor,
+): Promise<{ data: GlobalIncidentPage | null; error: string | null }> {
+  const supabase = await createClient();
+  const since = filters.since
+    ? new Date(Date.now() - INCIDENT_TIME_RANGE_HOURS[filters.since] * 60 * 60 * 1000).toISOString()
+    : null;
+
+  let pageQuery = supabase.from("incidents").select(GLOBAL_INCIDENT_COLUMNS);
+  if (filters.projectId) {
+    pageQuery = pageQuery.eq("project_id", filters.projectId);
+  }
+  if (filters.status === "open") {
+    pageQuery = pageQuery.is("resolved_at", null);
+  } else if (filters.status === "resolved") {
+    pageQuery = pageQuery.not("resolved_at", "is", null);
+  }
+  if (since) {
+    pageQuery = pageQuery.gte("started_at", since);
+  }
+
+  if (cursor?.direction === "next") {
+    pageQuery = pageQuery.lt("started_at", cursor.startedAt).order("started_at", {
+      ascending: false,
+    });
+  } else if (cursor?.direction === "previous") {
+    pageQuery = pageQuery.gt("started_at", cursor.startedAt).order("started_at", {
+      ascending: true,
+    });
+  } else {
+    pageQuery = pageQuery.order("started_at", { ascending: false });
+  }
+
+  const { data, error } = await pageQuery.limit(INCIDENT_PAGE_SIZE);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  const rawRows = (
+    cursor?.direction === "previous" ? [...data].reverse() : data
+  ) as unknown as RawGlobalIncidentRow[];
+  const rows: GlobalIncidentRow[] = rawRows.map(({ projects, ...incident }) => ({
+    ...incident,
+    project_name: projects?.name ?? "Unknown project",
+  }));
+
+  if (rows.length === 0) {
+    return { data: { rows: [], hasNext: false, hasPrevious: false }, error: null };
+  }
+
+  const globalNewest = rows[0].started_at;
+  const globalOldest = rows[rows.length - 1].started_at;
+
+  let olderQuery = supabase
+    .from("incidents")
+    .select("id", { count: "exact", head: true })
+    .lt("started_at", globalOldest);
+  let newerQuery = supabase
+    .from("incidents")
+    .select("id", { count: "exact", head: true })
+    .gt("started_at", globalNewest);
+
+  if (filters.projectId) {
+    olderQuery = olderQuery.eq("project_id", filters.projectId);
+    newerQuery = newerQuery.eq("project_id", filters.projectId);
+  }
+  if (filters.status === "open") {
+    olderQuery = olderQuery.is("resolved_at", null);
+    newerQuery = newerQuery.is("resolved_at", null);
+  } else if (filters.status === "resolved") {
+    olderQuery = olderQuery.not("resolved_at", "is", null);
+    newerQuery = newerQuery.not("resolved_at", "is", null);
+  }
+  if (since) {
+    olderQuery = olderQuery.gte("started_at", since);
+    newerQuery = newerQuery.gte("started_at", since);
+  }
+
+  const [{ count: globalOlderCount, error: globalOlderError }, { count: globalNewerCount, error: globalNewerError }] =
+    await Promise.all([olderQuery, newerQuery]);
+
+  if (globalOlderError || globalNewerError) {
+    return { data: null, error: (globalOlderError ?? globalNewerError)!.message };
+  }
+
+  return {
+    data: {
+      rows,
+      hasNext: (globalOlderCount ?? 0) > 0,
+      hasPrevious: (globalNewerCount ?? 0) > 0,
     },
     error: null,
   };
