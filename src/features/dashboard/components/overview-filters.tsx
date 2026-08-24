@@ -24,7 +24,11 @@ function FilterChip({
   children: React.ReactNode;
 }) {
   return (
-    <Badge asChild variant={active ? variant : "outline"} className="cursor-pointer gap-1">
+    <Badge
+      asChild
+      variant={active ? variant : "outline"}
+      className="cursor-pointer gap-1 px-2.5 py-1"
+    >
       <Link href={href} scroll={false}>
         {children}
       </Link>

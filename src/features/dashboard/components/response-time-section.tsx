@@ -27,7 +27,7 @@ export function ResponseTimeSection({
 
   return (
     <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6">
         <CardTitle>Response time</CardTitle>
         <div className="flex flex-wrap gap-1">
           {UPTIME_WINDOWS.map((w) => (
@@ -42,7 +42,7 @@ export function ResponseTimeSection({
           ))}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <ResponseTimeChart series={seriesByWindow[selected]} window={selected} />
       </CardContent>
     </Card>

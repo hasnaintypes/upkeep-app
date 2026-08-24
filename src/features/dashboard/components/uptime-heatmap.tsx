@@ -66,10 +66,10 @@ function CellTooltip({ point }: { point: DailyHistoryPoint }) {
 export function UptimeHeatmap({ history }: { history: DailyHistoryPoint[] }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-4 sm:px-6">
         <CardTitle>Uptime history</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <div className="flex gap-0.5 overflow-x-auto pb-2">
           {history.map((point) => (
             <Tooltip key={point.day}>
@@ -93,7 +93,7 @@ export function UptimeHeatmap({ history }: { history: DailyHistoryPoint[] }) {
             </Tooltip>
           ))}
         </div>
-        <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className={cn("size-2.5 rounded-sm", HEATMAP_CELL_COLOR.healthy)} />
             Healthy

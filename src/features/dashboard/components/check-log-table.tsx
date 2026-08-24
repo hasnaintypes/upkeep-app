@@ -52,10 +52,10 @@ export function CheckLogTable({
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-4 sm:px-6">
         <CardTitle>Check log</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4 px-4 sm:px-6">
         {page.rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">No checks recorded yet.</p>
         ) : (
@@ -64,7 +64,7 @@ export function CheckLogTable({
               <TableHeader>
                 <TableRow>
                   <TableHead>Status</TableHead>
-                  <TableHead>HTTP</TableHead>
+                  <TableHead className="hidden sm:table-cell">HTTP</TableHead>
                   <TableHead className="text-right">Response time</TableHead>
                   <TableHead>Checked at</TableHead>
                   <TableHead>Error</TableHead>
@@ -77,7 +77,7 @@ export function CheckLogTable({
                       <TableCell>
                         <StatusBadge status={row.status} />
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden text-muted-foreground sm:table-cell">
                         {row.http_status ?? "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
@@ -89,7 +89,7 @@ export function CheckLogTable({
                       >
                         {formatCheckedAt(row.checked_at)}
                       </TableCell>
-                      <TableCell className="max-w-64 truncate text-muted-foreground">
+                      <TableCell className="max-w-32 truncate text-muted-foreground sm:max-w-64">
                         {row.error_message ?? "—"}
                       </TableCell>
                     </TableRow>

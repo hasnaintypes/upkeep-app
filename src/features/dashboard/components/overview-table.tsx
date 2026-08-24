@@ -7,17 +7,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Project } from "@/features/projects";
 import { StatusBadge } from "./status-badge";
 import { UPTIME_WINDOWS } from "../constants";
-import type { ProjectUptimeSummary } from "../types";
+import type { ProjectUptimeSummary, UptimeWindowKey } from "../types";
+
+/** Column-priority breakpoints for the uptime-window columns on narrow
+ * viewports: 24h (the window users care about first) stays visible at
+ * every width, 7d joins at `sm`, 30d/90d join at `md` -- so a 375px phone
+ * shows Status/Project/24h without needing horizontal scroll, rather than
+ * cramming all 7 columns and relying solely on the table's built-in
+ * `overflow-x-auto` (mobile-responsive pass, issue #34). */
+const UPTIME_COLUMN_VISIBILITY: Record<UptimeWindowKey, string> = {
+  "24h": "",
+  "7d": "hidden sm:table-cell",
+  "30d": "hidden md:table-cell",
+  "90d": "hidden md:table-cell",
+};
 
 /** Renders one uptime-window cell, "—" for a window with no data yet
  * (brand-new project, or a window entirely older than its first check). */
-function UptimeCell({ value }: { value: number | null }) {
+function UptimeCell({ value, className }: { value: number | null; className?: string }) {
   return (
-    <TableCell className="text-right tabular-nums text-muted-foreground">
+    <TableCell className={cn("text-right tabular-nums text-muted-foreground", className)}>
       {value === null ? "—" : `${value}%`}
     </TableCell>
   );
@@ -48,9 +61,12 @@ export function OverviewTable({
         <TableRow>
           <TableHead>Status</TableHead>
           <TableHead>Project</TableHead>
-          <TableHead>Last checked</TableHead>
+          <TableHead className="hidden sm:table-cell">Last checked</TableHead>
           {UPTIME_WINDOWS.map((window) => (
-            <TableHead key={window.key} className="text-right">
+            <TableHead
+              key={window.key}
+              className={cn("text-right", UPTIME_COLUMN_VISIBILITY[window.key])}
+            >
               {window.label}
             </TableHead>
           ))}
@@ -77,7 +93,7 @@ export function OverviewTable({
                 </p>
               </TableCell>
               <TableCell
-                className="text-muted-foreground"
+                className="hidden text-muted-foreground sm:table-cell"
                 title={
                   summary?.last_checked_at
                     ? new Date(summary.last_checked_at).toLocaleString()
@@ -88,10 +104,10 @@ export function OverviewTable({
                   ? formatRelativeTime(summary.last_checked_at)
                   : "Never"}
               </TableCell>
-              <UptimeCell value={summary?.uptime_24h ?? null} />
-              <UptimeCell value={summary?.uptime_7d ?? null} />
-              <UptimeCell value={summary?.uptime_30d ?? null} />
-              <UptimeCell value={summary?.uptime_90d ?? null} />
+              <UptimeCell value={summary?.uptime_24h ?? null} className={UPTIME_COLUMN_VISIBILITY["24h"]} />
+              <UptimeCell value={summary?.uptime_7d ?? null} className={UPTIME_COLUMN_VISIBILITY["7d"]} />
+              <UptimeCell value={summary?.uptime_30d ?? null} className={UPTIME_COLUMN_VISIBILITY["30d"]} />
+              <UptimeCell value={summary?.uptime_90d ?? null} className={UPTIME_COLUMN_VISIBILITY["90d"]} />
             </TableRow>
           );
         })}

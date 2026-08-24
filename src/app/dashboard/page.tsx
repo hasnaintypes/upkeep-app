@@ -68,7 +68,7 @@ async function OverviewLoader({
 
   if (!projects || projects.length === 0) {
     return (
-      <Card variant="soft" className="flex flex-col items-center gap-3 p-10 text-center">
+      <Card variant="soft" className="flex flex-col items-center gap-3 p-6 text-center sm:p-10">
         <CardTitle className="text-base">No active projects yet</CardTitle>
         <CardDescription>
           Add a project and activate it to see its status here.
@@ -95,7 +95,7 @@ async function OverviewLoader({
         pathname="/dashboard"
       />
       {filteredProjects.length === 0 ? (
-        <Card variant="soft" className="flex flex-col items-center gap-3 p-10 text-center">
+        <Card variant="soft" className="flex flex-col items-center gap-3 p-6 text-center sm:p-10">
           <CardTitle className="text-base">No projects match your filters</CardTitle>
           <CardDescription>Try removing a filter or searching for something else.</CardDescription>
           {hasActiveFilters(filters) && (
