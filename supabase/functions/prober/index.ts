@@ -65,6 +65,7 @@ import { writeCheckResults } from "./persist.ts";
 import { recordProberSuccess } from "./self-monitor.ts";
 import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { InsertableClient } from "./persist.ts";
+import { maybeOpenIncidents, type IncidentClient } from "./incidents.ts";
 
 /** Reads an optional `project_id` out of the request body. Malformed/empty
  * bodies (including pg_cron's literal `{}`) resolve to `null`, not a thrown
@@ -89,7 +90,7 @@ const prober = {
       // otherwise blows the type-checker's instantiation depth limit
       // (TS2589) without changing anything at runtime.
       return runManualCheck(
-        ctx.supabaseAdmin as unknown as ProjectLookupClient & InsertableClient,
+        ctx.supabaseAdmin as unknown as ProjectLookupClient & InsertableClient & IncidentClient,
         manualProjectId,
       );
     }
@@ -126,6 +127,20 @@ const prober = {
       const persisted = await writeCheckResults(ctx.supabaseAdmin, classified);
       const persistedById = new Map(persisted.map((p) => [p.project_id, p]));
 
+      // Incident detection (#35) only makes sense against a `checks` row
+      // that's actually on disk -- a project whose write just failed above
+      // is skipped here rather than evaluated against stale/missing data.
+      const incidentInputs = classified
+        .filter(({ result }) => persistedById.get(result.project_id)?.persisted)
+        .map(({ result, status }) => ({ project_id: result.project_id, status }));
+      const incidents = await maybeOpenIncidents(
+        ctx.supabaseAdmin as unknown as IncidentClient,
+        incidentInputs,
+      );
+      const incidentByProjectId = new Map(
+        incidentInputs.map((entry, index) => [entry.project_id, incidents[index]]),
+      );
+
       // The pipeline ran to completion without throwing -- a genuine
       // success (#27), regardless of whether any individual project's own
       // check came back down/unknown or failed to persist (both already
@@ -139,6 +154,7 @@ const prober = {
           status,
           persisted: persistedById.get(result.project_id)?.persisted ?? false,
           persist_error: persistedById.get(result.project_id)?.error ?? null,
+          incident: incidentByProjectId.get(result.project_id) ?? null,
         })),
       });
     } finally {

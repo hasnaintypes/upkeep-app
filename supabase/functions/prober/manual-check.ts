@@ -27,6 +27,7 @@ import type { DueProject } from "./check.ts";
 import { runHealthCheckWithRetry } from "./retry.ts";
 import { classifyCheck } from "./classify.ts";
 import { writeCheckResult, type InsertableClient } from "./persist.ts";
+import { maybeOpenIncident, type IncidentClient } from "./incidents.ts";
 
 /** The minimal shape this module needs to look up one project by id --
  * mirrors persist.ts's InsertableClient in spirit: narrow and structural,
@@ -56,7 +57,7 @@ export type ProjectLookupClient = {
  * is a batch-scheduling concern, not a manual-trigger one.
  */
 export async function runManualCheck(
-  supabaseAdmin: ProjectLookupClient & InsertableClient,
+  supabaseAdmin: ProjectLookupClient & InsertableClient & IncidentClient,
   projectId: string,
 ): Promise<Response> {
   const { data: project, error } = await supabaseAdmin
@@ -76,6 +77,14 @@ export async function runManualCheck(
   const status = classifyCheck(result, project);
   const persisted = await writeCheckResult(supabaseAdmin, result, status);
 
+  // Same incident detection (#35) as the batch path -- a manual "run check
+  // now" can just as validly be the check that crosses the escalation
+  // threshold, and skips it the same way on a failed write (persisted ===
+  // false means there's no new `checks` row for maybeOpenIncident to see).
+  const incident = persisted.persisted
+    ? await maybeOpenIncident(supabaseAdmin, result.project_id, status)
+    : null;
+
   return Response.json({
     manual: true,
     project_id: result.project_id,
@@ -85,5 +94,6 @@ export async function runManualCheck(
     error_message: result.error_message,
     persisted: persisted.persisted,
     persist_error: persisted.error ?? null,
+    incident,
   });
 }

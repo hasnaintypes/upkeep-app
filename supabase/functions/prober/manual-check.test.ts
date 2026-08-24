@@ -5,6 +5,9 @@ import { assertEquals } from "jsr:@std/assert@1";
 import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { DueProject } from "./check.ts";
 import type { InsertableClient } from "./persist.ts";
+import type { IncidentClient } from "./incidents.ts";
+
+type FakeClient = ProjectLookupClient & InsertableClient & IncidentClient;
 
 function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
   return {
@@ -20,30 +23,67 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
   };
 }
 
+/** Combined fake client covering every table this pipeline touches:
+ * `projects` (the manual lookup), `checks` (persist.ts's insert *and*
+ * incidents.ts's "recent checks for this project" select), and
+ * `incidents` (the "already open?" select incidents.ts also runs). The
+ * `checks`/`incidents` selects always report an empty history -- these
+ * tests are about the check/persist pipeline itself, not incident
+ * escalation (see incidents.test.ts for that), so keeping every recent-
+ * checks lookup below the threshold means maybeOpenIncident short-circuits
+ * on "below_threshold" without needing a richer fake here. */
 function fakeClient(project: DueProject | null): {
-  client: ProjectLookupClient & InsertableClient;
+  client: FakeClient;
   inserted: Record<string, unknown>[];
 } {
   const inserted: Record<string, unknown>[] = [];
-  return {
-    inserted,
-    client: {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      from: (table: string) => ({
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        select: (columns: string) => ({
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          eq: (column: string, value: string) => ({
-            maybeSingle: () => Promise.resolve({ data: project, error: null }),
+  const client = {
+    from: (table: string) => {
+      if (table === "projects") {
+        return {
+          select: (_columns: string) => ({
+            eq: (_column: string, _value: string) => ({
+              maybeSingle: () => Promise.resolve({ data: project, error: null }),
+            }),
           }),
-        }),
-        insert: (values: Record<string, unknown>) => {
-          inserted.push(values);
-          return Promise.resolve({ error: null });
-        },
-      }),
+        };
+      }
+
+      if (table === "checks") {
+        return {
+          select: (_columns: string) => ({
+            eq: (_column: string, _value: string) => ({
+              order: (_column: string, _opts: { ascending: boolean }) => ({
+                limit: (_n: number) => Promise.resolve({ data: [], error: null }),
+              }),
+            }),
+          }),
+          insert: (values: Record<string, unknown>) => {
+            inserted.push(values);
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
+
+      if (table === "incidents") {
+        return {
+          select: (_columns: string) => ({
+            eq: (_column: string, _value: string) => ({
+              is: (_column: string, _value: null) => ({
+                limit: (_n: number) => Promise.resolve({ data: [], error: null }),
+              }),
+            }),
+          }),
+          insert: (_values: Record<string, unknown>) => Promise.resolve({ error: null }),
+        };
+      }
+
+      throw new Error(`unexpected table: ${table}`);
+      // deno-lint-ignore no-explicit-any
     },
-  };
+  } as any;
+
+  return { client, inserted };
 }
 
 /** Temporarily replaces globalThis.fetch for the duration of `run`, always
@@ -68,7 +108,9 @@ Deno.test("runManualCheck: 404s when the project doesn't exist / isn't owned by 
 });
 
 Deno.test("runManualCheck: 500s when the lookup itself fails, never throws", async () => {
-  const failingClient: ProjectLookupClient & InsertableClient = {
+  // The lookup itself fails, so the pipeline never reaches persist.ts/
+  // incidents.ts -- this fake only needs to satisfy the `projects` branch.
+  const failingClient = {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     from: (table: string) => ({
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -82,7 +124,8 @@ Deno.test("runManualCheck: 500s when the lookup itself fails, never throws", asy
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       insert: (values: Record<string, unknown>) => Promise.resolve({ error: null }),
     }),
-  };
+    // deno-lint-ignore no-explicit-any
+  } as any as FakeClient;
 
   const response = await runManualCheck(failingClient, "test-project");
   assertEquals(response.status, 500);
