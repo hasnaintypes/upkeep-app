@@ -10,11 +10,8 @@
 // #40's own scope was this contract plus the routing/orchestration that
 // decides *which* channels get an event (see notifier.ts) -- not the real
 // channel integrations themselves, each its own follow-up issue. Discord
-// (#41) and generic webhook (#43) are real implementations (see discord.ts/
-// webhook.ts); email remains a documented stub that reports itself as not
-// yet implemented rather than silently pretending to succeed (a stub that
-// returned `{ ok: true }` would make a real, un-sent notification
-// indistinguishable from a genuinely delivered one).
+// (#41), generic webhook (#43), and email via Resend (#44) are all real
+// implementations now (see discord.ts/webhook.ts/email.ts).
 //
 // Telegram was descoped, not stubbed (#42, see docs/PRD.md §5.5) -- unlike
 // webhook/email, which are still-planned follow-ups, there is deliberately
@@ -26,6 +23,25 @@
 
 import { dispatchDiscord } from "./discord.ts";
 import { dispatchWebhook } from "./webhook.ts";
+import { createEmailDispatcher } from "./email.ts";
+
+/** `Deno.env.get` throws (not returns `undefined`) when the `env`
+ * permission for that specific variable hasn't been granted -- true for a
+ * plain `deno test` run with no `--allow-env` flag, which this project's
+ * documented workflow (AGENTS.md) deliberately doesn't require. The
+ * deployed Edge Function runtime grants access to its own configured
+ * secrets automatically, so this only ever falls back to `undefined`
+ * locally under `deno test`/`deno check` -- exactly the same "not
+ * configured" state as a genuinely-unset secret, which
+ * `createEmailDispatcher` already handles gracefully (#44's own
+ * "fails gracefully" acceptance criterion). */
+function readEnv(name: string): string | undefined {
+  try {
+    return Deno.env.get(name);
+  } catch {
+    return undefined;
+  }
+}
 
 /** One `notification_channels` row, exactly as dispatchers need it -- `type`
  * narrowed to the three values the table's own check constraint allows
@@ -85,27 +101,19 @@ export type ChannelDispatcher = (
   event: NotificationEvent,
 ) => Promise<DispatchResult>;
 
-/** A stub dispatcher for a channel type that doesn't have a real
- * implementation yet -- reports itself as unimplemented rather than
- * silently succeeding (see this module's own top comment for why "fake
- * success" would be worse than an honest, loggable failure) or silently
- * dropping the event with no result at all. #44 replaces its own entry in
- * `DISPATCHERS` below with a real implementation; nothing else in this
- * module changes when that happens (#41/discord.ts and #43/webhook.ts are
- * the reference examples of exactly that swap). */
-function notYetImplemented(issueRef: string): ChannelDispatcher {
-  return (channel) =>
-    Promise.resolve({
-      ok: false,
-      error: `channel type "${channel.type}" is not implemented yet (see ${issueRef})`,
-    });
-}
-
 /** The full plugin registry -- `notifier.ts` looks up a channel's
  * dispatcher by `type` here and never needs to know anything else about
- * how a given channel type actually delivers a message. */
+ * how a given channel type actually delivers a message. The Resend API key
+ * is read exactly once here, at module load (via `readEnv` above) -- see
+ * email.ts's own top comment for why it's threaded in as a parameter
+ * rather than read inside the dispatcher itself (testability, and "exactly
+ * one place in the codebase reads the raw secret"). If a future channel
+ * type is added without a real implementation ready yet, reintroduce a
+ * small `notYetImplemented(issueRef)` helper here (removed once #41/#43/
+ * #44 all shipped, since nothing used it anymore) rather than leaving a
+ * type unregistered. */
 export const DISPATCHERS: Record<NotificationChannelType, ChannelDispatcher> = {
   discord: dispatchDiscord,
   webhook: dispatchWebhook,
-  email: notYetImplemented("#44"),
+  email: createEmailDispatcher(readEnv("RESEND_API_KEY"), readEnv("RESEND_FROM_ADDRESS")),
 };

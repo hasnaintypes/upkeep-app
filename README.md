@@ -129,6 +129,34 @@ Until both secrets exist, the cron job runs every minute but fails harmlessly (v
 `select * from cron.job_run_details order by start_time desc limit 5;`) since it can't build a
 valid request URL/header. No projects are checked until this one-time setup is done.
 
+The `notifier` function (fires on incident open/resolve, `#40`) is scheduled the same way — see the
+`schedule_notifier_cron` migration, no dashboard setup needed there either.
+
+#### Email notifications (Resend)
+
+The email channel (`#44`) sends via [Resend](https://resend.com)'s HTTP API, not raw SMTP. Create a
+free account, generate an API key (Dashboard → API Keys), then set it as an Edge Function secret —
+this is a separate secrets store from `.env`/`.env.local`, managed via the CLI, never committed:
+
+```bash
+pnpm supabase secrets set RESEND_API_KEY=<your resend api key>
+```
+
+Without a verified sending domain, Resend only allows sending from its shared
+`onboarding@resend.dev` address and only *to* the email address your Resend account itself was
+created with — which is exactly this app's own use case (a self-hosting user alerting themselves
+about their own projects), so this is a permanent, free configuration, not a temporary sandbox
+limitation to graduate out of. If you later verify a custom domain with Resend, override the
+sender without any code change:
+
+```bash
+pnpm supabase secrets set RESEND_FROM_ADDRESS="Upkeep <alerts@yourdomain.com>"
+```
+
+Until `RESEND_API_KEY` is set, an email-type `notification_channels` row simply fails gracefully
+(logged, not thrown) on every dispatch attempt — same per-channel isolation as every other channel
+type (`#40`).
+
 ### Before opening a PR
 
 ```bash

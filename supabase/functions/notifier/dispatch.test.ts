@@ -1,47 +1,13 @@
 // Unit tests for dispatch.ts's plugin registry -- no real Supabase project
-// or network access needed (discord's/webhook's own dispatch logic is
-// covered in discord.test.ts/webhook.test.ts; this file only asserts on
-// the registry shape itself).
+// or network access needed. Each dispatcher's own logic is covered in its
+// own test file (discord.test.ts/webhook.test.ts/email.test.ts); this file
+// only asserts on the registry shape itself, and that importing it never
+// throws even without env permissions (see dispatch.ts's own `readEnv`
+// comment -- a plain `deno test` run with no `--allow-env` flag must still
+// work, per this project's documented workflow).
 import { assertEquals } from "@std/assert";
-import { DISPATCHERS, type NotificationChannel, type NotificationEvent } from "./dispatch.ts";
-
-function fakeChannel(overrides: Partial<NotificationChannel> = {}): NotificationChannel {
-  return {
-    id: "channel-1",
-    type: "email",
-    config: {},
-    ...overrides,
-  };
-}
-
-function fakeEvent(overrides: Partial<NotificationEvent> = {}): NotificationEvent {
-  return {
-    kind: "opened",
-    project: { id: "project-1", name: "Test Project" },
-    incident: {
-      id: "incident-1",
-      started_at: "2026-08-25T00:00:00Z",
-      resolved_at: null,
-      cause: "timeout",
-    },
-    ...overrides,
-  };
-}
+import { DISPATCHERS } from "./dispatch.ts";
 
 Deno.test("DISPATCHERS: has an entry for every channel type the notification_channels table allows", () => {
   assertEquals(Object.keys(DISPATCHERS).sort(), ["discord", "email", "webhook"]);
 });
-
-// discord (#41) and webhook (#43) are real implementations now -- see
-// discord.test.ts/webhook.test.ts. email (#44) remains a documented stub.
-// Telegram (#42) was descoped entirely, not stubbed -- see dispatch.ts's
-// own top comment.
-for (const type of ["email"] as const) {
-  Deno.test(`DISPATCHERS.${type}: reports itself as not yet implemented, never throws`, async () => {
-    const result = await DISPATCHERS[type](fakeChannel({ type }), fakeEvent());
-    assertEquals(result.ok, false);
-    if (!result.ok) {
-      assertEquals(result.error.includes(type), true);
-    }
-  });
-}
