@@ -26,7 +26,7 @@ export const HOW_IT_WORKS_CAPABILITIES: [ContentRow, ContentRow, ContentRow, Con
   },
   {
     title: "Multi-channel alerts",
-    description: "Discord, Telegram, email, or a webhook - fired on status change only.",
+    description: "Discord, email, or a webhook - fired on status change only.",
   },
   {
     title: "Self-hosted & free",
@@ -53,6 +53,6 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     title: "Get notified",
     description:
-      "Discord, Telegram, email, or a webhook - fired only when a project's status actually changes.",
+      "Discord, email, or a webhook - fired only when a project's status actually changes.",
   },
 ];

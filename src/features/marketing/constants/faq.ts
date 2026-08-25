@@ -30,7 +30,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "item-4",
     question: "How will I get notified when something breaks?",
     answer:
-      "Discord webhook, Telegram bot, email, or a generic outgoing webhook for your own integrations. Notifications fire on status change only, not on every check, so you get one alert per incident instead of a flood.",
+      "Discord webhook, email, or a generic outgoing webhook for your own integrations. Notifications fire on status change only, not on every check, so you get one alert per incident instead of a flood.",
   },
   {
     id: "item-5",

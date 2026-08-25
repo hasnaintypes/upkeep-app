@@ -7,7 +7,7 @@ import { DISPATCHERS, type NotificationChannel, type NotificationEvent } from ".
 function fakeChannel(overrides: Partial<NotificationChannel> = {}): NotificationChannel {
   return {
     id: "channel-1",
-    type: "telegram",
+    type: "webhook",
     config: {},
     ...overrides,
   };
@@ -28,12 +28,13 @@ function fakeEvent(overrides: Partial<NotificationEvent> = {}): NotificationEven
 }
 
 Deno.test("DISPATCHERS: has an entry for every channel type the notification_channels table allows", () => {
-  assertEquals(Object.keys(DISPATCHERS).sort(), ["discord", "email", "telegram", "webhook"]);
+  assertEquals(Object.keys(DISPATCHERS).sort(), ["discord", "email", "webhook"]);
 });
 
 // discord (#41) is a real implementation now -- see discord.test.ts.
-// telegram/webhook/email (#42-#44) remain documented stubs.
-for (const type of ["telegram", "email", "webhook"] as const) {
+// webhook/email (#43-#44) remain documented stubs. Telegram (#42) was
+// descoped entirely, not stubbed -- see dispatch.ts's own top comment.
+for (const type of ["email", "webhook"] as const) {
   Deno.test(`DISPATCHERS.${type}: reports itself as not yet implemented, never throws`, async () => {
     const result = await DISPATCHERS[type](fakeChannel({ type }), fakeEvent());
     assertEquals(result.ok, false);

@@ -139,7 +139,6 @@ function fakeDispatchers(
   const alwaysOk: ChannelDispatcher = () => Promise.resolve({ ok: true });
   return {
     discord: alwaysOk,
-    telegram: alwaysOk,
     webhook: alwaysOk,
     email: alwaysOk,
     ...overrides,

@@ -45,7 +45,7 @@ export const CORE_FEATURES: CoreFeature[] = [
     icon: "notifications",
     title: "Multi-channel notifications",
     description:
-      "Discord webhook, Telegram bot, email, or a generic outgoing webhook for your own integrations.",
+      "Discord webhook, email, or a generic outgoing webhook for your own integrations.",
   },
   {
     icon: "hosts",
