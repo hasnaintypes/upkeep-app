@@ -10,11 +10,11 @@
 // #40's own scope was this contract plus the routing/orchestration that
 // decides *which* channels get an event (see notifier.ts) -- not the real
 // channel integrations themselves, each its own follow-up issue. Discord
-// (#41) is the first real implementation (see discord.ts); webhook/email
-// remain documented stubs that report themselves as not yet implemented
-// rather than silently pretending to succeed (a stub that returned
-// `{ ok: true }` would make a real, un-sent notification indistinguishable
-// from a genuinely delivered one).
+// (#41) and generic webhook (#43) are real implementations (see discord.ts/
+// webhook.ts); email remains a documented stub that reports itself as not
+// yet implemented rather than silently pretending to succeed (a stub that
+// returned `{ ok: true }` would make a real, un-sent notification
+// indistinguishable from a genuinely delivered one).
 //
 // Telegram was descoped, not stubbed (#42, see docs/PRD.md §5.5) -- unlike
 // webhook/email, which are still-planned follow-ups, there is deliberately
@@ -25,6 +25,7 @@
 // demand -- see #42's closing comment.
 
 import { dispatchDiscord } from "./discord.ts";
+import { dispatchWebhook } from "./webhook.ts";
 
 /** One `notification_channels` row, exactly as dispatchers need it -- `type`
  * narrowed to the three values the table's own check constraint allows
@@ -88,10 +89,10 @@ export type ChannelDispatcher = (
  * implementation yet -- reports itself as unimplemented rather than
  * silently succeeding (see this module's own top comment for why "fake
  * success" would be worse than an honest, loggable failure) or silently
- * dropping the event with no result at all. Each of #43-#44 replaces its
- * own entry in `DISPATCHERS` below with a real implementation; nothing
- * else in this module changes when that happens (#41/discord.ts is the
- * reference example of exactly that swap). */
+ * dropping the event with no result at all. #44 replaces its own entry in
+ * `DISPATCHERS` below with a real implementation; nothing else in this
+ * module changes when that happens (#41/discord.ts and #43/webhook.ts are
+ * the reference examples of exactly that swap). */
 function notYetImplemented(issueRef: string): ChannelDispatcher {
   return (channel) =>
     Promise.resolve({
@@ -105,6 +106,6 @@ function notYetImplemented(issueRef: string): ChannelDispatcher {
  * how a given channel type actually delivers a message. */
 export const DISPATCHERS: Record<NotificationChannelType, ChannelDispatcher> = {
   discord: dispatchDiscord,
-  webhook: notYetImplemented("#43"),
+  webhook: dispatchWebhook,
   email: notYetImplemented("#44"),
 };
