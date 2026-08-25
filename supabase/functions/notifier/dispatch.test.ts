@@ -1,13 +1,14 @@
-// Unit tests for dispatch.ts's stub registry -- no real Supabase project or
-// network access needed.
+// Unit tests for dispatch.ts's plugin registry -- no real Supabase project
+// or network access needed (discord's own dispatch logic is covered in
+// discord.test.ts; this file only asserts on the registry shape itself).
 import { assertEquals } from "@std/assert";
 import { DISPATCHERS, type NotificationChannel, type NotificationEvent } from "./dispatch.ts";
 
 function fakeChannel(overrides: Partial<NotificationChannel> = {}): NotificationChannel {
   return {
     id: "channel-1",
-    type: "discord",
-    config: { webhook_url: "https://discord.test/webhook" },
+    type: "telegram",
+    config: {},
     ...overrides,
   };
 }
@@ -30,7 +31,9 @@ Deno.test("DISPATCHERS: has an entry for every channel type the notification_cha
   assertEquals(Object.keys(DISPATCHERS).sort(), ["discord", "email", "telegram", "webhook"]);
 });
 
-for (const type of ["discord", "telegram", "email", "webhook"] as const) {
+// discord (#41) is a real implementation now -- see discord.test.ts.
+// telegram/webhook/email (#42-#44) remain documented stubs.
+for (const type of ["telegram", "email", "webhook"] as const) {
   Deno.test(`DISPATCHERS.${type}: reports itself as not yet implemented, never throws`, async () => {
     const result = await DISPATCHERS[type](fakeChannel({ type }), fakeEvent());
     assertEquals(result.ok, false);

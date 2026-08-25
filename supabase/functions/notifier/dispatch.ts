@@ -7,13 +7,16 @@
 // inside the notifier's core loop" (PRD §5.10's own plugin-architecture
 // wording).
 //
-// #40's own scope is this contract plus the routing/orchestration that
+// #40's own scope was this contract plus the routing/orchestration that
 // decides *which* channels get an event (see notifier.ts) -- not the real
-// channel integrations themselves, which are each their own follow-up
-// issue. Every dispatcher below is a documented stub that reports itself as
-// not yet implemented rather than silently pretending to succeed (a stub
-// that returned `{ ok: true }` would make a real, un-sent notification
+// channel integrations themselves, each its own follow-up issue. Discord
+// (#41) is the first real implementation (see discord.ts); telegram/
+// webhook/email remain documented stubs that report themselves as not yet
+// implemented rather than silently pretending to succeed (a stub that
+// returned `{ ok: true }` would make a real, un-sent notification
 // indistinguishable from a genuinely delivered one).
+
+import { dispatchDiscord } from "./discord.ts";
 
 /** One `notification_channels` row, exactly as dispatchers need it -- `type`
  * narrowed to the four values the table's own check constraint allows
@@ -77,9 +80,10 @@ export type ChannelDispatcher = (
  * implementation yet -- reports itself as unimplemented rather than
  * silently succeeding (see this module's own top comment for why "fake
  * success" would be worse than an honest, loggable failure) or silently
- * dropping the event with no result at all. Each of #41-#44 replaces its
+ * dropping the event with no result at all. Each of #42-#44 replaces its
  * own entry in `DISPATCHERS` below with a real implementation; nothing
- * else in this module changes when that happens. */
+ * else in this module changes when that happens (#41/discord.ts is the
+ * reference example of exactly that swap). */
 function notYetImplemented(issueRef: string): ChannelDispatcher {
   return (channel) =>
     Promise.resolve({
@@ -92,7 +96,7 @@ function notYetImplemented(issueRef: string): ChannelDispatcher {
  * dispatcher by `type` here and never needs to know anything else about
  * how a given channel type actually delivers a message. */
 export const DISPATCHERS: Record<NotificationChannelType, ChannelDispatcher> = {
-  discord: notYetImplemented("#41"),
+  discord: dispatchDiscord,
   telegram: notYetImplemented("#42"),
   webhook: notYetImplemented("#43"),
   email: notYetImplemented("#44"),
