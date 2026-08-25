@@ -131,6 +131,7 @@ export type Database = {
           notified: boolean
           project_id: string
           resolved_at: string | null
+          resolved_notified: boolean
           started_at: string
         }
         Insert: {
@@ -139,6 +140,7 @@ export type Database = {
           notified?: boolean
           project_id: string
           resolved_at?: string | null
+          resolved_notified?: boolean
           started_at?: string
         }
         Update: {
@@ -147,6 +149,7 @@ export type Database = {
           notified?: boolean
           project_id?: string
           resolved_at?: string | null
+          resolved_notified?: boolean
           started_at?: string
         }
         Relationships: [
@@ -222,6 +225,7 @@ export type Database = {
           digest_only: boolean
           escalation_threshold: number
           id: string
+          is_muted: boolean
           project_id: string
         }
         Insert: {
@@ -229,6 +233,7 @@ export type Database = {
           digest_only?: boolean
           escalation_threshold?: number
           id?: string
+          is_muted?: boolean
           project_id: string
         }
         Update: {
@@ -236,6 +241,7 @@ export type Database = {
           digest_only?: boolean
           escalation_threshold?: number
           id?: string
+          is_muted?: boolean
           project_id?: string
         }
         Relationships: [
