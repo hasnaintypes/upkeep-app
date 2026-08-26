@@ -4,8 +4,8 @@ import { BRAND_NAME, GITHUB_URL } from "@/features/marketing";
 import { isExternalUrl } from "@/lib/utils";
 
 const LEGAL_LINKS = [
-  { title: "Privacy Policy", href: "#" },
-  { title: "Terms", href: "#" },
+  { title: "Privacy Policy", href: "/privacy" },
+  { title: "Terms", href: "/terms" },
 ];
 
 async function getCurrentYear() {
