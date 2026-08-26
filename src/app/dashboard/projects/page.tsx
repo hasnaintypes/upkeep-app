@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -37,14 +36,9 @@ export default function ProjectsPage() {
             Projects you&apos;re monitoring.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/projects/import">Import</Link>
-          </Button>
-          <Suspense fallback={<Button disabled>Add project</Button>}>
-            <AddProjectTrigger trigger={<Button>Add project</Button>} />
-          </Suspense>
-        </div>
+        <Suspense fallback={<Button disabled>Add project</Button>}>
+          <AddProjectTrigger trigger={<Button>Add project</Button>} />
+        </Suspense>
       </div>
       <Suspense
         fallback={

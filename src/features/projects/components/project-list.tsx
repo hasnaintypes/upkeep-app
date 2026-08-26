@@ -21,13 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -37,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AddProjectForm } from "./add-project-form";
+import { notify } from "@/lib/toast";
 import { AddProjectSheet } from "./add-project-sheet";
 import { deleteProject, setProjectActive } from "../lib/actions";
 import { runProjectCheckNow } from "../lib/run-check";
@@ -87,7 +80,6 @@ export function ProjectList({
     setProjects(initialProjects);
   }, [initialProjects]);
 
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -137,10 +129,13 @@ export function ProjectList({
         !project.is_active,
       );
       if (error || !data) {
-        setToggleError(error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setToggleError(message);
+        notify.error("Couldn't update project", message);
         return;
       }
       setProjects((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+      notify.success(data.is_active ? "Monitoring resumed" : "Monitoring paused", data.name);
     } finally {
       setPendingId(null);
     }
@@ -164,10 +159,22 @@ export function ProjectList({
     try {
       const { data, error } = await runProjectCheckNow(project.id);
       if (error || !data) {
-        setRunErrors((prev) => ({ ...prev, [project.id]: error ?? "Something went wrong." }));
+        const message = error ?? "Something went wrong.";
+        setRunErrors((prev) => ({ ...prev, [project.id]: message }));
+        notify.error(`Check failed for ${project.name}`, message);
         return;
       }
       setRunResults((prev) => ({ ...prev, [project.id]: data }));
+      const detail = `${data.response_time_ms}ms${data.http_status != null ? ` · HTTP ${data.http_status}` : ""}`;
+      if (data.status === "up") {
+        notify.success(`${project.name}: up`, detail);
+      } else if (data.status === "down") {
+        notify.error(`${project.name}: down`, detail);
+      } else if (data.status === "degraded" || data.status === "waking") {
+        notify.warning(`${project.name}: ${data.status}`, detail);
+      } else {
+        notify.info(`${project.name}: unknown`, detail);
+      }
     } finally {
       setRunningId(null);
     }
@@ -181,9 +188,11 @@ export function ProjectList({
       const { error } = await deleteProject(deletingProject.id);
       if (error) {
         setDeleteError(error);
+        notify.error(`Couldn't delete ${deletingProject.name}`, error);
         return;
       }
       setProjects((prev) => prev.filter((p) => p.id !== deletingProject.id));
+      notify.success(`${deletingProject.name} deleted`);
       setDeletingProject(null);
     } finally {
       setPendingId(null);
@@ -311,14 +320,18 @@ export function ProjectList({
                       <Power className="size-4" />
                     )}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Edit project"
-                    onClick={() => setEditingProject(project)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
+                  <AddProjectSheet
+                    trigger={
+                      <Button variant="ghost" size="icon" aria-label="Edit project">
+                        <Pencil className="size-4" />
+                      </Button>
+                    }
+                    project={project}
+                    existingCollections={existingCollections}
+                    onSuccess={(updated) =>
+                      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+                    }
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -338,33 +351,6 @@ export function ProjectList({
       ))}
 
       {toggleError && <p className="text-sm text-destructive">{toggleError}</p>}
-
-      <Dialog
-        open={!!editingProject}
-        onOpenChange={(open) => !open && setEditingProject(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit project</DialogTitle>
-            <DialogDescription>
-              Update {editingProject?.name}&apos;s settings.
-            </DialogDescription>
-          </DialogHeader>
-          {editingProject && (
-            <AddProjectForm
-              project={editingProject}
-              existingCollections={existingCollections}
-              onCancel={() => setEditingProject(null)}
-              onSuccess={(updated) => {
-                setProjects((prev) =>
-                  prev.map((p) => (p.id === updated.id ? updated : p)),
-                );
-                setEditingProject(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog
         open={!!deletingProject}

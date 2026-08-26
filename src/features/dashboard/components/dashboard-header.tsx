@@ -5,8 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 /** Route -> header title, matching `AppSidebar`'s own nav labels. Falls
- * back to the closest matching prefix so /dashboard/projects/import and
- * per-project detail pages still show "Projects", not nothing. */
+ * back to the closest matching prefix so per-project detail pages still
+ * show "Projects", not nothing. */
 const PAGE_TITLES: { prefix: string; title: string }[] = [
   { prefix: "/dashboard/projects", title: "Projects" },
   { prefix: "/dashboard/notifications", title: "Notifications" },

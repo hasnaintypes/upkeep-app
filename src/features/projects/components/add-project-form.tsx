@@ -25,6 +25,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { notify } from "@/lib/toast";
 import { createProject, updateProject, updateProjectHeaders } from "../lib/actions";
 import {
   createProjectFormDefaults,
@@ -108,7 +109,6 @@ export function AddProjectForm({
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -118,7 +118,6 @@ export function AddProjectForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    setSuccess(false);
 
     if (getDuplicateHeaderKeys(headerRows).size > 0) {
       setFormError("Header names must be unique (case-insensitive).");
@@ -184,7 +183,9 @@ export function AddProjectForm({
           tags: tagsList,
         });
         if (mainResult.error || !mainResult.data) {
-          setFormError(mainResult.error ?? "Something went wrong.");
+          const message = mainResult.error ?? "Something went wrong.";
+          setFormError(message);
+          notify.error("Couldn't save project", message);
           return;
         }
 
@@ -196,25 +197,28 @@ export function AddProjectForm({
             remove,
           });
           if (headersResult.error || !headersResult.data) {
-            setFormError(
-              headersResult.error ??
-                "Saved project details, but failed to save headers.",
-            );
+            const message =
+              headersResult.error ?? "Saved project details, but failed to save headers.";
+            setFormError(message);
+            notify.error("Couldn't save headers", message);
             return;
           }
           finalProject = headersResult.data;
         }
 
+        notify.success("Project updated", `${finalProject.name} was saved.`);
         onSuccess?.(finalProject);
       } else {
         const response = await createProject(result.data);
         if (response.error || !response.data) {
-          setFormError(response.error ?? "Something went wrong.");
+          const message = response.error ?? "Something went wrong.";
+          setFormError(message);
+          notify.error("Couldn't create project", message);
           return;
         }
-        setSuccess(true);
         setValues(toFormState());
         setHeaderRows([]);
+        notify.success("Project created", `${response.data.name} is now being monitored.`);
         onSuccess?.(response.data);
       }
     } finally {
@@ -454,11 +458,6 @@ export function AddProjectForm({
         </Accordion>
 
         {formError && <p className="text-sm text-destructive">{formError}</p>}
-        {success && (
-          <p className="text-sm text-emerald-600 dark:text-emerald-500">
-            Project created.
-          </p>
-        )}
 
         <Field
           orientation={onCancel ? "horizontal" : "vertical"}
