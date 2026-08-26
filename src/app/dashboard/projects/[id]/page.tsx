@@ -25,6 +25,7 @@ import type {
   ResponseTimeSeries,
   UptimeWindowKey,
 } from "@/features/dashboard";
+import { getNotificationChannels, getProjectNotificationRules, ProjectNotificationRules } from "@/features/notifications";
 
 /**
  * Per-project detail page (PRD §5.6, Phase 4/5): response-time graph (#30),
@@ -79,6 +80,8 @@ async function ProjectDetailLoader({
     { data: dailyHistory, error: historyError },
     { data: incidents, error: incidentsError },
     { data: checksPage, error: checksError },
+    { data: notificationRules, error: notificationRulesError },
+    { data: notificationChannels, error: notificationChannelsError },
   ] = await Promise.all([
     Promise.all(
       UPTIME_WINDOWS.map(async (w) => {
@@ -89,6 +92,8 @@ async function ProjectDetailLoader({
     getProjectDailyHistory(project.id),
     getProjectIncidentsPage(project.id, incidentsCursor),
     getProjectChecksPage(project.id, checksCursor),
+    getProjectNotificationRules(project.id),
+    getNotificationChannels(),
   ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
     UptimeWindowKey,
@@ -142,6 +147,19 @@ async function ProjectDetailLoader({
         <CheckLogTable
           projectId={project.id}
           page={checksPage ?? { rows: [], hasNext: false, hasPrevious: false }}
+        />
+      )}
+
+      {notificationRulesError || notificationChannelsError ? (
+        <p className="text-sm text-destructive">
+          Failed to load notification settings:{" "}
+          {notificationRulesError ?? notificationChannelsError}
+        </p>
+      ) : (
+        <ProjectNotificationRules
+          projectId={project.id}
+          initialRules={notificationRules ?? []}
+          allChannels={notificationChannels ?? []}
         />
       )}
     </div>
