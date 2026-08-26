@@ -2,12 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type {
+  DigestFrequency,
   NotificationChannelActionResult,
   NotificationChannelConfig,
   NotificationChannelType,
   NotificationRuleActionResult,
 } from "../types";
 import {
+  digestFrequencySchema,
   discordConfigSchema,
   emailConfigSchema,
   escalationThresholdSchema,
@@ -162,14 +164,29 @@ export async function deleteNotificationChannel(
 export async function createNotificationRule(
   projectId: string,
   channelId: string,
-  escalationThreshold: number,
+  options: {
+    escalationThreshold?: number;
+    digestOnly?: boolean;
+    digestFrequency?: DigestFrequency;
+  } = {},
 ): Promise<NotificationRuleActionResult> {
-  const thresholdResult = escalationThresholdSchema.safeParse(escalationThreshold);
+  const thresholdResult = escalationThresholdSchema.safeParse(
+    options.escalationThreshold ?? 1,
+  );
   if (!thresholdResult.success) {
     return {
       data: null,
       error: thresholdResult.error.issues[0]?.message ?? "Invalid escalation threshold.",
     };
+  }
+
+  let digestFrequency: DigestFrequency | undefined;
+  if (options.digestFrequency !== undefined) {
+    const frequencyResult = digestFrequencySchema.safeParse(options.digestFrequency);
+    if (!frequencyResult.success) {
+      return { data: null, error: "Invalid digest frequency." };
+    }
+    digestFrequency = frequencyResult.data;
   }
 
   const supabase = await createClient();
@@ -179,6 +196,8 @@ export async function createNotificationRule(
       project_id: projectId,
       channel_id: channelId,
       escalation_threshold: thresholdResult.data,
+      ...(options.digestOnly !== undefined && { digest_only: options.digestOnly }),
+      ...(digestFrequency !== undefined && { digest_frequency: digestFrequency }),
     })
     .select()
     .single();
@@ -201,9 +220,19 @@ export async function createNotificationRule(
  */
 export async function updateNotificationRule(
   id: string,
-  patch: { escalation_threshold?: number; digest_only?: boolean; is_muted?: boolean },
+  patch: {
+    escalation_threshold?: number;
+    digest_only?: boolean;
+    digest_frequency?: DigestFrequency;
+    is_muted?: boolean;
+  },
 ): Promise<NotificationRuleActionResult> {
-  const update: { escalation_threshold?: number; digest_only?: boolean; is_muted?: boolean } = {};
+  const update: {
+    escalation_threshold?: number;
+    digest_only?: boolean;
+    digest_frequency?: DigestFrequency;
+    is_muted?: boolean;
+  } = {};
 
   if (patch.escalation_threshold !== undefined) {
     const thresholdResult = escalationThresholdSchema.safeParse(patch.escalation_threshold);
@@ -217,6 +246,13 @@ export async function updateNotificationRule(
   }
   if (patch.digest_only !== undefined) {
     update.digest_only = patch.digest_only;
+  }
+  if (patch.digest_frequency !== undefined) {
+    const frequencyResult = digestFrequencySchema.safeParse(patch.digest_frequency);
+    if (!frequencyResult.success) {
+      return { data: null, error: "Invalid digest frequency." };
+    }
+    update.digest_frequency = frequencyResult.data;
   }
   if (patch.is_muted !== undefined) {
     update.is_muted = patch.is_muted;

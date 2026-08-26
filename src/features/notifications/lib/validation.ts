@@ -50,3 +50,6 @@ export const escalationThresholdSchema = z.coerce
   .int()
   .min(1, "Must be at least 1.")
   .max(ESCALATION_THRESHOLD_INPUT_MAX, `Must be ${ESCALATION_THRESHOLD_INPUT_MAX} or less.`);
+
+/** Matches `project_notification_rules_digest_frequency_valid` (#46). */
+export const digestFrequencySchema = z.enum(["daily", "weekly"]);

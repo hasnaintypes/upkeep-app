@@ -132,6 +132,13 @@ valid request URL/header. No projects are checked until this one-time setup is d
 The `notifier` function (fires on incident open/resolve, `#40`) is scheduled the same way — see the
 `schedule_notifier_cron` migration, no dashboard setup needed there either.
 
+The `digest` function (daily/weekly portfolio-health email, `#46`) is scheduled on two separate
+`pg_cron` jobs instead of the shared 1-minute tick — see the `schedule_digest_cron` migration. Same
+`project_url`/`prober_secret_key` vault secrets as above, no new one needed. A user only receives a
+digest if at least one of their projects has a `digest_only` notification rule configured (`#45`'s
+UI, "Digest only" toggle + frequency select) — otherwise both cron jobs invoke the function and it
+finds zero recipients for that cadence, which is expected, not an error.
+
 #### Email notifications (Resend)
 
 The email channel (`#44`) sends via [Resend](https://resend.com)'s HTTP API, not raw SMTP. Create a

@@ -28,6 +28,16 @@ export type ProjectNotificationRule = Tables<"project_notification_rules">;
  */
 export type NotificationChannelType = "discord" | "email" | "webhook";
 
+/**
+ * Cadence for a rule's digest email (PRD §5.5, Phase 6, #46), matching the
+ * `project_notification_rules_digest_frequency_valid` check constraint.
+ * Only meaningful when `digest_only` is true -- see that column's own
+ * migration comment. Hand-declared rather than derived from the generated
+ * `Database` type, same reasoning as `NotificationChannelType` above
+ * (`digest_frequency` comes back as plain `string` there).
+ */
+export type DigestFrequency = "daily" | "weekly";
+
 /** `notification_channels.config` shape per type -- matches each
  * dispatcher's own `*Config` type in `supabase/functions/notifier/*.ts`
  * (`discord.ts`'s `DiscordConfig`, `email.ts`'s `EmailConfig`, `webhook.ts`'s

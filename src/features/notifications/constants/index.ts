@@ -1,4 +1,4 @@
-import type { NotificationChannelType } from "../types";
+import type { DigestFrequency, NotificationChannelType } from "../types";
 
 /** Ordered options for the "add channel" type select, matching the
  * `notification_channels_type_valid` check constraint and the
@@ -40,3 +40,13 @@ export const NOTIFIER_MAX_EFFECTIVE_ESCALATION_THRESHOLD = 2;
  * itself only requires `> 0` and a future prober change could raise the
  * effective ceiling without a UI change. */
 export const ESCALATION_THRESHOLD_INPUT_MAX = 10;
+
+/** Ordered options for the digest frequency select (#46), matching the
+ * `project_notification_rules_digest_frequency_valid` check constraint and
+ * the two `pg_cron` schedules in the `schedule_digest_cron` migration. */
+export const DIGEST_FREQUENCY_OPTIONS: { value: DigestFrequency; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+];
+
+export const DEFAULT_DIGEST_FREQUENCY: DigestFrequency = "daily";

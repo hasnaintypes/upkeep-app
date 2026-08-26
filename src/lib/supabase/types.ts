@@ -222,6 +222,7 @@ export type Database = {
       project_notification_rules: {
         Row: {
           channel_id: string
+          digest_frequency: string
           digest_only: boolean
           escalation_threshold: number
           id: string
@@ -230,6 +231,7 @@ export type Database = {
         }
         Insert: {
           channel_id: string
+          digest_frequency?: string
           digest_only?: boolean
           escalation_threshold?: number
           id?: string
@@ -238,6 +240,7 @@ export type Database = {
         }
         Update: {
           channel_id?: string
+          digest_frequency?: string
           digest_only?: boolean
           escalation_threshold?: number
           id?: string
@@ -338,6 +341,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_digest_recipients: {
+        Args: { p_frequency: string }
+        Returns: {
+          to_email: string
+          user_id: string
+        }[]
+      }
       get_due_projects: {
         Args: never
         Returns: {
@@ -391,6 +401,17 @@ export type Database = {
           uptime_30d: number
           uptime_7d: number
           uptime_90d: number
+        }[]
+      }
+      get_user_portfolio_summary: {
+        Args: { p_period_hours: number; p_user_id: string }
+        Returns: {
+          incident_count: number
+          last_checked_at: string
+          last_status: string
+          project_id: string
+          project_name: string
+          uptime_percentage: number
         }[]
       }
       record_prober_success: { Args: never; Returns: undefined }

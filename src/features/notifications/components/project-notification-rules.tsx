@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { notify } from "@/lib/toast";
 import {
   createNotificationRule,
   deleteNotificationRule,
@@ -31,21 +32,24 @@ import {
 import { describeChannelConfig } from "../lib/config-mask";
 import {
   DEFAULT_ESCALATION_THRESHOLD,
+  DIGEST_FREQUENCY_OPTIONS,
   ESCALATION_THRESHOLD_INPUT_MAX,
   NOTIFICATION_CHANNEL_TYPE_LABELS,
   NOTIFIER_MAX_EFFECTIVE_ESCALATION_THRESHOLD,
 } from "../constants";
 import type {
+  DigestFrequency,
   NotificationChannel,
   NotificationChannelType,
   NotificationRuleWithChannel,
 } from "../types";
 
 /**
- * Per-project notification rules panel (this issue, #45): attach/detach
- * channels, set each rule's `escalation_threshold`, toggle `digest_only`,
- * and mute/unmute -- rendered on the project detail page
- * (src/app/dashboard/projects/[id]/page.tsx). `allChannels` comes from
+ * Per-project notification rules panel (#45): attach/detach channels, set
+ * each rule's `escalation_threshold`, toggle `digest_only`, pick that
+ * digest's cadence (`digest_frequency`, #46 -- only shown/editable once
+ * `digest_only` is on), and mute/unmute -- rendered on the project detail
+ * page (src/app/dashboard/projects/[id]/page.tsx). `allChannels` comes from
  * `getNotificationChannels()` (this user's full channel list, not just
  * ones already attached here) so the "attach a channel" picker can offer
  * whatever isn't attached to *this* project yet.
@@ -88,13 +92,13 @@ export function ProjectNotificationRules({
     setIsAttaching(true);
     try {
       const threshold = Number(newThreshold) || DEFAULT_ESCALATION_THRESHOLD;
-      const { data, error } = await createNotificationRule(
-        projectId,
-        selectedChannelId,
-        threshold,
-      );
+      const { data, error } = await createNotificationRule(projectId, selectedChannelId, {
+        escalationThreshold: threshold,
+      });
       if (error || !data) {
-        setAttachError(error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setAttachError(message);
+        notify.error("Couldn't attach channel", message);
         return;
       }
       const channel = allChannels.find((c) => c.id === selectedChannelId);
@@ -103,6 +107,7 @@ export function ProjectNotificationRules({
       }
       setSelectedChannelId("");
       setNewThreshold(String(DEFAULT_ESCALATION_THRESHOLD));
+      notify.success("Channel attached");
     } finally {
       setIsAttaching(false);
     }
@@ -119,12 +124,15 @@ export function ProjectNotificationRules({
         escalation_threshold: threshold,
       });
       if (error || !data) {
-        setRuleError(rule.id, error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setRuleError(rule.id, message);
+        notify.error("Couldn't update threshold", message);
         return;
       }
       setRules((prev) =>
         prev.map((r) => (r.id === rule.id ? { ...r, escalation_threshold: data.escalation_threshold } : r)),
       );
+      notify.success("Threshold updated");
     } finally {
       setPendingId(null);
     }
@@ -138,10 +146,32 @@ export function ProjectNotificationRules({
         digest_only: !rule.digest_only,
       });
       if (error || !data) {
-        setRuleError(rule.id, error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setRuleError(rule.id, message);
+        notify.error("Couldn't update rule", message);
         return;
       }
       setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, digest_only: data.digest_only } : r)));
+      notify.success(data.digest_only ? "Switched to digest only" : "Switched to immediate alerts");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function handleChangeDigestFrequency(rule: NotificationRuleWithChannel, frequency: DigestFrequency) {
+    setRuleError(rule.id, null);
+    setPendingId(rule.id);
+    try {
+      const { data, error } = await updateNotificationRule(rule.id, {
+        digest_frequency: frequency,
+      });
+      if (error || !data) {
+        setRuleError(rule.id, error ?? "Something went wrong.");
+        return;
+      }
+      setRules((prev) =>
+        prev.map((r) => (r.id === rule.id ? { ...r, digest_frequency: data.digest_frequency } : r)),
+      );
     } finally {
       setPendingId(null);
     }
@@ -153,10 +183,13 @@ export function ProjectNotificationRules({
     try {
       const { data, error } = await setNotificationRuleMuted(rule.id, !rule.is_muted);
       if (error || !data) {
-        setRuleError(rule.id, error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setRuleError(rule.id, message);
+        notify.error("Couldn't update rule", message);
         return;
       }
       setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, is_muted: data.is_muted } : r)));
+      notify.success(data.is_muted ? "Rule muted" : "Rule unmuted");
     } finally {
       setPendingId(null);
     }
@@ -169,9 +202,11 @@ export function ProjectNotificationRules({
       const { error } = await deleteNotificationRule(rule.id);
       if (error) {
         setRuleError(rule.id, error);
+        notify.error("Couldn't remove rule", error);
         return;
       }
       setRules((prev) => prev.filter((r) => r.id !== rule.id));
+      notify.success("Notification rule removed");
     } finally {
       setPendingId(null);
     }
@@ -250,6 +285,32 @@ export function ProjectNotificationRules({
                       onCheckedChange={() => handleToggleDigestOnly(rule)}
                     />
                   </Field>
+
+                  {rule.digest_only && (
+                    <Field orientation="horizontal" className="w-auto gap-2">
+                      <FieldLabel htmlFor={`digest-frequency-${rule.id}`} className="text-xs">
+                        Frequency
+                      </FieldLabel>
+                      <Select
+                        value={rule.digest_frequency}
+                        onValueChange={(value) =>
+                          handleChangeDigestFrequency(rule, value as DigestFrequency)
+                        }
+                        disabled={pendingId === rule.id}
+                      >
+                        <SelectTrigger id={`digest-frequency-${rule.id}`} className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIGEST_FREQUENCY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
 
                   <Field orientation="horizontal" className="w-auto gap-2">
                     <FieldLabel htmlFor={`mute-${rule.id}`} className="text-xs">
