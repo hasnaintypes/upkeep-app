@@ -312,6 +312,9 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          keep_alive_timezone: string | null
+          keep_alive_window_end: string | null
+          keep_alive_window_start: string | null
           last_keep_alive_at: string | null
           last_manual_check_at: string | null
           method: string
@@ -336,6 +339,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          keep_alive_timezone?: string | null
+          keep_alive_window_end?: string | null
+          keep_alive_window_start?: string | null
           last_keep_alive_at?: string | null
           last_manual_check_at?: string | null
           method?: string
@@ -360,6 +366,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          keep_alive_timezone?: string | null
+          keep_alive_window_end?: string | null
+          keep_alive_window_start?: string | null
           last_keep_alive_at?: string | null
           last_manual_check_at?: string | null
           method?: string
@@ -400,6 +409,9 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          keep_alive_timezone: string | null
+          keep_alive_window_end: string | null
+          keep_alive_window_start: string | null
           last_keep_alive_at: string | null
           last_manual_check_at: string | null
           method: string
@@ -433,6 +445,9 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          keep_alive_timezone: string | null
+          keep_alive_window_end: string | null
+          keep_alive_window_start: string | null
           last_keep_alive_at: string | null
           last_manual_check_at: string | null
           method: string
@@ -484,6 +499,7 @@ export type Database = {
           uptime_percentage: number
         }[]
       }
+      is_valid_timezone: { Args: { tz: string }; Returns: boolean }
       record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
       try_acquire_prober_lock: {

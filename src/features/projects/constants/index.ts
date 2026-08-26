@@ -18,6 +18,21 @@ export const PROJECT_DEFAULTS = {
 } as const;
 
 /**
+ * IANA time zone names the keep-alive active window's start/end times are
+ * offered against (PRD §5.8, #49) -- sourced from the runtime's own time
+ * zone database via `Intl.supportedValuesOf`, not a hand-maintained list, so
+ * it never drifts from what `is_valid_timezone()` (see
+ * supabase/migrations/*_add_keep_alive_active_window.sql) actually accepts.
+ * Available in every runtime this app targets (browsers since 2022, Node 18+
+ * for the createProject server action's own re-validation) -- see MDN's
+ * compat table if that ever needs revisiting.
+ */
+export const IANA_TIMEZONES: readonly string[] =
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : [];
+
+/**
  * Minimum time between manual "run check now" triggers for the same
  * project (PRD §5.2/§3, issue #28) -- must match the
  * `try_claim_manual_check` SQL function's own `p_cooldown_seconds` default

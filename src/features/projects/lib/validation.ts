@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PROJECT_DEFAULTS } from "../constants";
+import { IANA_TIMEZONES, PROJECT_DEFAULTS } from "../constants";
 
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -42,6 +42,41 @@ export const healthUrlSchema = z
       });
     }
   });
+
+const TIME_OF_DAY_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * `<input type="time">` reports an empty string when cleared, never
+ * `undefined` -- normalized to `null` here (not kept as `""`) since the
+ * underlying `projects.keep_alive_window_start`/`_end` columns are `time`,
+ * which rejects an empty string as an invalid literal. `null` is also this
+ * feature's actual "unset" sentinel end to end, matching
+ * `keep_alive_timezone` below and the DB's own all-or-nothing check
+ * constraint (see supabase/migrations/*_add_keep_alive_active_window.sql).
+ */
+const optionalTimeOfDay = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || TIME_OF_DAY_PATTERN.test(value), "Enter a time as HH:MM.")
+  .optional()
+  .transform((value) => (value ? value : null));
+
+/**
+ * Validated against the runtime's own IANA time zone database
+ * (constants/index.ts's `IANA_TIMEZONES`, from `Intl.supportedValuesOf`)
+ * rather than just checking "non-empty" -- so a typo'd zone name is caught
+ * in the form instead of surfacing later as a silent scheduling no-op or a
+ * DB round-trip rejected by `is_valid_timezone()`.
+ */
+const optionalTimezone = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || IANA_TIMEZONES.includes(value),
+    "Enter a valid IANA time zone (e.g. America/New_York).",
+  )
+  .optional()
+  .transform((value) => (value ? value : null));
 
 /**
  * Shared with the client-side "Add project" form and the createProject
@@ -100,6 +135,57 @@ export const createProjectSchema = z.object({
   headers: z
     .record(z.string().trim().min(1), z.string().trim().min(1))
     .optional(),
+  // Independent of monitoring/alerting (PRD §5.8) -- pings every 10 minutes
+  // purely to prevent free-tier idling. See PROJECT_DEFAULTS.keepAliveEnabled.
+  keep_alive_enabled: z.boolean().optional(),
+  // The daily window keep-alive pings are restricted to, in
+  // keep_alive_timezone -- null/unset on any of the three means "always
+  // warm" (PRD §5.8's explicit fallback), enforced together below since the
+  // DB requires all three or none (see the migration referenced above).
+  keep_alive_window_start: optionalTimeOfDay,
+  keep_alive_window_end: optionalTimeOfDay,
+  keep_alive_timezone: optionalTimezone,
+}).superRefine((values, ctx) => {
+  const { keep_alive_window_start, keep_alive_window_end, keep_alive_timezone } = values;
+  const setCount = [keep_alive_window_start, keep_alive_window_end, keep_alive_timezone].filter(
+    (value) => value !== null,
+  ).length;
+
+  if (setCount > 0 && setCount < 3) {
+    if (keep_alive_window_start === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["keep_alive_window_start"],
+        message: "Set a start time, or clear the other active window fields.",
+      });
+    }
+    if (keep_alive_window_end === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["keep_alive_window_end"],
+        message: "Set an end time, or clear the other active window fields.",
+      });
+    }
+    if (keep_alive_timezone === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["keep_alive_timezone"],
+        message: "Set a time zone, or clear the other active window fields.",
+      });
+    }
+  }
+
+  if (
+    keep_alive_window_start !== null &&
+    keep_alive_window_end !== null &&
+    keep_alive_window_start === keep_alive_window_end
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["keep_alive_window_end"],
+      message: "End time must be different from the start time.",
+    });
+  }
 });
 
 export type CreateProjectFormValues = z.infer<typeof createProjectSchema>;
@@ -118,4 +204,8 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   collection: "",
   tags: [],
   headers: {},
+  keep_alive_enabled: PROJECT_DEFAULTS.keepAliveEnabled,
+  keep_alive_window_start: null,
+  keep_alive_window_end: null,
+  keep_alive_timezone: null,
 };

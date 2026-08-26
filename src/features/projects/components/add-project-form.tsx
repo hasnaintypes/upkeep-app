@@ -11,6 +11,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -26,6 +27,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { notify } from "@/lib/toast";
+import { IANA_TIMEZONES } from "../constants";
 import { createProject, updateProject, updateProjectHeaders } from "../lib/actions";
 import {
   createProjectFormDefaults,
@@ -42,13 +44,35 @@ import {
   type HeaderRow,
 } from "./header-fields-editor";
 
-type FormState = Omit<CreateProjectFormValues, "tags" | "headers"> & {
+type FormState = Omit<
+  CreateProjectFormValues,
+  "tags" | "headers" | "keep_alive_window_start" | "keep_alive_window_end" | "keep_alive_timezone"
+> & {
   tagsInput: string;
+  // Kept as plain (possibly empty) strings here, not `string | null` like
+  // CreateProjectFormValues -- <input type="time">/<input> need a string
+  // `value` prop, and createProjectSchema's optionalTimeOfDay/optionalTimezone
+  // already normalize "" to null at parse time (lib/validation.ts).
+  keep_alive_window_start: string;
+  keep_alive_window_end: string;
+  keep_alive_timezone: string;
 };
+
+/** Postgres returns `time` columns as "HH:MM:SS" -- <input type="time">'s default (minute)
+ * step only accepts "HH:MM", so the seconds are dropped here. */
+function toTimeInputValue(value: string | null): string {
+  return value ? value.slice(0, 5) : "";
+}
 
 function toFormState(project?: Project): FormState {
   if (!project) {
-    return { ...createProjectFormDefaults, tagsInput: "" };
+    return {
+      ...createProjectFormDefaults,
+      tagsInput: "",
+      keep_alive_window_start: "",
+      keep_alive_window_end: "",
+      keep_alive_timezone: "",
+    };
   }
   return {
     name: project.name,
@@ -62,6 +86,10 @@ function toFormState(project?: Project): FormState {
     hosting_provider: project.hosting_provider ?? "",
     collection: project.collection ?? "",
     tagsInput: (project.tags ?? []).join(", "),
+    keep_alive_enabled: project.keep_alive_enabled,
+    keep_alive_window_start: toTimeInputValue(project.keep_alive_window_start),
+    keep_alive_window_end: toTimeInputValue(project.keep_alive_window_end),
+    keep_alive_timezone: project.keep_alive_timezone ?? "",
   };
 }
 
@@ -167,6 +195,10 @@ export function AddProjectForm({
           hosting_provider,
           collection,
           tags: tagsList,
+          keep_alive_enabled,
+          keep_alive_window_start,
+          keep_alive_window_end,
+          keep_alive_timezone,
         } = result.data;
 
         const mainResult = await updateProject(project.id, {
@@ -181,6 +213,10 @@ export function AddProjectForm({
           hosting_provider,
           collection,
           tags: tagsList,
+          keep_alive_enabled,
+          keep_alive_window_start,
+          keep_alive_window_end,
+          keep_alive_timezone,
         });
         if (mainResult.error || !mainResult.data) {
           const message = mainResult.error ?? "Something went wrong.";
@@ -452,6 +488,100 @@ export function AddProjectForm({
                 </Field>
 
                 <HeaderFieldsEditor rows={headerRows} onChange={setHeaderRows} />
+
+                <Field orientation="horizontal" className="w-auto gap-2">
+                  <FieldLabel htmlFor="keep_alive_enabled">
+                    Keep-alive pings
+                  </FieldLabel>
+                  <Switch
+                    id="keep_alive_enabled"
+                    checked={values.keep_alive_enabled}
+                    onCheckedChange={(checked) =>
+                      updateField("keep_alive_enabled", checked)
+                    }
+                  />
+                </Field>
+                <FieldDescription className="-mt-2">
+                  Pings this project every 10 minutes to prevent free-tier
+                  idling, independent of monitoring/alerting above.
+                </FieldDescription>
+
+                {values.keep_alive_enabled && (
+                  <>
+                    <Field
+                      orientation="responsive"
+                      data-invalid={!!fieldErrors.keep_alive_window_start}
+                    >
+                      <FieldLabel htmlFor="keep_alive_window_start">
+                        Active window start
+                      </FieldLabel>
+                      <Input
+                        id="keep_alive_window_start"
+                        type="time"
+                        aria-invalid={!!fieldErrors.keep_alive_window_start}
+                        value={values.keep_alive_window_start}
+                        onChange={(e) =>
+                          updateField("keep_alive_window_start", e.target.value)
+                        }
+                      />
+                      <FieldError
+                        errors={toFieldErrorMessages(fieldErrors.keep_alive_window_start)}
+                      />
+                    </Field>
+
+                    <Field
+                      orientation="responsive"
+                      data-invalid={!!fieldErrors.keep_alive_window_end}
+                    >
+                      <FieldLabel htmlFor="keep_alive_window_end">
+                        Active window end
+                      </FieldLabel>
+                      <Input
+                        id="keep_alive_window_end"
+                        type="time"
+                        aria-invalid={!!fieldErrors.keep_alive_window_end}
+                        value={values.keep_alive_window_end}
+                        onChange={(e) =>
+                          updateField("keep_alive_window_end", e.target.value)
+                        }
+                      />
+                      <FieldError
+                        errors={toFieldErrorMessages(fieldErrors.keep_alive_window_end)}
+                      />
+                    </Field>
+
+                    <Field
+                      orientation="responsive"
+                      data-invalid={!!fieldErrors.keep_alive_timezone}
+                    >
+                      <FieldLabel htmlFor="keep_alive_timezone">
+                        Active window time zone
+                      </FieldLabel>
+                      <Input
+                        id="keep_alive_timezone"
+                        list="keep-alive-timezone-suggestions"
+                        placeholder="America/New_York"
+                        aria-invalid={!!fieldErrors.keep_alive_timezone}
+                        value={values.keep_alive_timezone}
+                        onChange={(e) =>
+                          updateField("keep_alive_timezone", e.target.value)
+                        }
+                      />
+                      <datalist id="keep-alive-timezone-suggestions">
+                        {IANA_TIMEZONES.map((tz) => (
+                          <option key={tz} value={tz} />
+                        ))}
+                      </datalist>
+                      <FieldDescription>
+                        Leave all three active-window fields blank to ping
+                        continuously instead of only during set hours.
+                      </FieldDescription>
+                      <FieldError
+                        errors={toFieldErrorMessages(fieldErrors.keep_alive_timezone)}
+                      />
+                    </Field>
+                  </>
+                )}
               </FieldGroup>
             </AccordionContent>
           </AccordionItem>
