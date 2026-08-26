@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { notify } from "@/lib/toast";
 import { createNotificationChannel, updateNotificationChannel } from "../lib/actions";
 import { createChannelSchema } from "../lib/validation";
 import { NOTIFICATION_CHANNEL_TYPES } from "../constants";
@@ -96,7 +97,9 @@ export function AddChannelForm({
         : await createNotificationChannel(result.data.type, result.data.config);
 
       if (response.error || !response.data) {
-        setFormError(response.error ?? "Something went wrong.");
+        const message = response.error ?? "Something went wrong.";
+        setFormError(message);
+        notify.error(isEditing ? "Couldn't save channel" : "Couldn't add channel", message);
         return;
       }
       setConfigValue("");

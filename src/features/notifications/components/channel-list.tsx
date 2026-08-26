@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { notify } from "@/lib/toast";
 import { AddChannelForm } from "./add-channel-form";
 import { deleteNotificationChannel, setChannelActive } from "../lib/actions";
 import { describeChannelConfig } from "../lib/config-mask";
@@ -66,10 +67,13 @@ export function ChannelList({
         !channel.is_active,
       );
       if (error || !data) {
-        setToggleError(error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setToggleError(message);
+        notify.error("Couldn't update channel", message);
         return;
       }
       setChannels((prev) => prev.map((c) => (c.id === data.id ? data : c)));
+      notify.success(data.is_active ? "Channel activated" : "Channel deactivated");
     } finally {
       setPendingId(null);
     }
@@ -83,9 +87,11 @@ export function ChannelList({
       const { error } = await deleteNotificationChannel(deletingChannel.id);
       if (error) {
         setDeleteError(error);
+        notify.error("Couldn't delete channel", error);
         return;
       }
       setChannels((prev) => prev.filter((c) => c.id !== deletingChannel.id));
+      notify.success("Channel deleted");
       setDeletingChannel(null);
     } finally {
       setPendingId(null);
@@ -113,6 +119,7 @@ export function ChannelList({
               onSuccess={(created) => {
                 setChannels((prev) => [...prev, created]);
                 setAddOpen(false);
+                notify.success("Channel added");
               }}
             />
           </DialogContent>
@@ -189,6 +196,7 @@ export function ChannelList({
               onSuccess={(updated) => {
                 setChannels((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
                 setEditingChannel(null);
+                notify.success("Channel updated");
               }}
             />
           )}

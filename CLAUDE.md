@@ -49,6 +49,7 @@ Env vars (see `.env.example`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE
 ## Notes
 
 - Styling: Tailwind CSS v4 (via `@tailwindcss/postcss`, no `tailwind.config.ts`), dark/light theme via `next-themes`.
+- Toasts: shadcn's sonner-based `<Toaster />` is mounted once in `src/app/layout.tsx`. Use the `notify` helper (`src/lib/toast.ts`) — `notify.success/error/info/warning/loading` — instead of calling `sonner`'s `toast()` directly, so variant usage stays consistent. Toasts are for one-shot action feedback (a mutation succeeded/failed); keep inline `<FieldError>`/field-level messages for form validation instead of toasting those.
 
 ## Working Conventions
 

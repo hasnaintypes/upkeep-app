@@ -101,6 +101,7 @@ Feature-based `src/` layout. Path alias `@/*` → `./src/*` (not repo root).
 - Fonts: DM Sans (body/UI) + Geist Mono (code/tabular numbers) via `next/font/google` in `src/app/layout.tsx`, wired as CSS variables (`--font-dm-sans` / `--font-geist-mono`) referenced from the `@theme` block. Apply via `.variable` + Tailwind's `font-sans`/`font-mono` utilities — don't switch back to `.className`.
 - `framer-motion` is pinned at exact version `13.1.1` (no caret) — don't let a routine `pnpm update` silently bump it.
 - Animation utility classes (`animate-in`, `fade-in-0`, `zoom-in-95`, etc., used by `components/ui/dropdown-menu.tsx`) come from `tw-animate-css`, the Tailwind v4 equivalent of `tailwindcss-animate` (v3-only, don't reinstall it).
+- Toasts: shadcn's sonner-based `<Toaster />` is mounted once in `src/app/layout.tsx`. Use the `notify` helper (`src/lib/toast.ts`) — `notify.success/error/info/warning/loading` — instead of calling `sonner`'s `toast()` directly. Toasts are for one-shot action feedback (a mutation succeeded/failed); keep inline `<FieldError>`/field-level messages for form validation.
 
 ## Gotchas
 
