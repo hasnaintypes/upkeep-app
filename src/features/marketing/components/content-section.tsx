@@ -7,7 +7,7 @@ import { Reveal } from "./reveal";
 export function ContentSection() {
   return (
     <section>
-      <div className="bg-muted/50 py-24">
+      <div className="bg-muted/50 py-20 lg:py-24">
         <div className="mx-auto w-full max-w-5xl px-6">
           <Reveal>
             <span className="text-primary text-sm font-semibold">
@@ -106,7 +106,7 @@ function IncidentLifecycleIllustration({ className }: { className?: string }) {
             key={term}
             className={cn(
               index === 2 &&
-                "text-foreground before:absolute before:-translate-x-[110%] before:text-orange-500 before:content-['Grouped']",
+                "text-foreground before:absolute before:-translate-x-[110%] before:text-muted-foreground before:content-['Grouped']",
             )}
           >
             {term}

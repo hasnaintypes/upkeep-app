@@ -80,7 +80,7 @@ function HostGroup({ hidden = false }: { hidden?: boolean }) {
  */
 export function SupportedHostsSection() {
   return (
-    <section className="bg-background overflow-hidden py-16 lg:py-20">
+    <section className="bg-background overflow-hidden py-20 lg:py-24">
       <div className="mx-auto max-w-5xl space-y-10 px-6 text-center lg:space-y-14">
         <h2 className="text-xl text-balance md:text-2xl lg:text-3xl">
           {SUPPORTED_HOSTS_CONTENT.heading}{" "}

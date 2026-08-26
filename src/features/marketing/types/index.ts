@@ -3,14 +3,6 @@ export interface NavLink {
   href: string;
 }
 
-export type FeatureIcon = "checks" | "status" | "dashboard" | "speed";
-
-export interface FeatureCard {
-  title: string;
-  description: string;
-  icon: FeatureIcon;
-}
-
 /** One title/description block in the content section's two-row layout. */
 export interface ContentRow {
   title: string;
@@ -33,9 +25,7 @@ export type CoreFeatureIcon =
   | "hosts"
   | "self-hosted";
 
-/** One icon + title + description item in the "Core Features" sidebar
- * grid (distinct from the shorter, four-card `FeatureCard` list above it
- * on the page -- this one runs through the fuller real feature set). */
+/** One icon + title + description item in the landing page's features grid. */
 export interface CoreFeature {
   icon: CoreFeatureIcon;
   title: string;

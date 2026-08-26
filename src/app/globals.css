@@ -246,9 +246,10 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Text selection styling */
+  /* Text selection styling -- neutral, matching this project's strictly
+     achromatic theme (no chromatic accent color exists anywhere else). */
   ::selection {
-    background-color: #7170ff;
-    color: white;
+    background-color: color-mix(in oklab, var(--foreground) 85%, transparent);
+    color: var(--background);
   }
 }

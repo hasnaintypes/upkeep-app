@@ -11,7 +11,7 @@ import { Reveal } from "./reveal";
 
 export function FAQSection() {
   return (
-    <section id="faq" className="py-24 lg:py-28">
+    <section id="faq" className="py-20 lg:py-24">
       <div className="mx-auto max-w-5xl px-6">
         <div className="grid gap-8 md:grid-cols-5 md:gap-12">
           <Reveal className="md:col-span-2">

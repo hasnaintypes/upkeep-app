@@ -2,8 +2,12 @@ import Link from "next/link";
 import {
   Activity,
   ArrowRight,
+  Bell,
+  Globe,
   Layers,
-  LayoutDashboard,
+  ListChecks,
+  PiggyBank,
+  Send,
   SlidersHorizontal,
   Zap,
   type LucideIcon,
@@ -11,20 +15,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { AUTH_ROUTES } from "@/features/auth/constants/routes";
 import { CTA_CONTENT } from "../constants/cta";
-import { FEATURE_CARDS, FEATURES_CONTENT } from "../constants/features";
-import type { FeatureCard as FeatureCardData, FeatureIcon } from "../types";
+import { CORE_FEATURES } from "../constants/core-features";
+import { FEATURES_CONTENT } from "../constants/features";
+import type { CoreFeature, CoreFeatureIcon } from "../types";
 import { Reveal } from "./reveal";
 
-const ICONS: Record<FeatureIcon, LucideIcon> = {
+const ICONS: Record<CoreFeatureIcon, LucideIcon> = {
   checks: SlidersHorizontal,
   status: Activity,
-  dashboard: LayoutDashboard,
-  speed: Zap,
+  "keep-alive": Zap,
+  incidents: ListChecks,
+  alerts: Bell,
+  notifications: Send,
+  hosts: Globe,
+  "self-hosted": PiggyBank,
 };
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-24 lg:py-28">
+    <section id="features" className="py-20 lg:py-24">
       <div className="mx-auto w-full max-w-7xl px-6">
         <Reveal>
           <div className="flex w-fit flex-col gap-2 border-b pb-2">
@@ -59,8 +68,8 @@ export function FeaturesSection() {
           />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURE_CARDS.map((card, index) => (
-              <Reveal key={card.title} delay={index * 100}>
+            {CORE_FEATURES.map((card, index) => (
+              <Reveal key={card.title} delay={index * 60}>
                 <FeatureCardItem card={card} />
               </Reveal>
             ))}
@@ -71,7 +80,7 @@ export function FeaturesSection() {
   );
 }
 
-function FeatureCardItem({ card }: { card: FeatureCardData }) {
+function FeatureCardItem({ card }: { card: CoreFeature }) {
   const Icon = ICONS[card.icon];
 
   return (

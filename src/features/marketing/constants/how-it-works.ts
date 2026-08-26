@@ -6,8 +6,6 @@ export const HOW_IT_WORKS_CONTENT = {
   headingHighlight: "uptime watchdog",
   headingRest:
     ", pings every project's health endpoint on its own schedule, classifies what it finds, and alerts you the moment something changes.",
-  primaryCta: "Get started free",
-  secondaryCta: "View on GitHub",
   stepsEyebrow: "Step by step",
 };
 

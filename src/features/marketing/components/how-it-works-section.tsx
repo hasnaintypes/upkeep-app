@@ -1,7 +1,3 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { AUTH_ROUTES } from "@/features/auth/constants/routes";
-import { GITHUB_URL } from "../constants/navigation";
 import {
   HOW_IT_WORKS_CAPABILITIES,
   HOW_IT_WORKS_CONTENT,
@@ -24,7 +20,7 @@ const [capabilityA, capabilityB, capabilityC, capabilityD] = HOW_IT_WORKS_CAPABI
  */
 export function HowItWorksSection() {
   return (
-    <section className="bg-muted/50 py-16 md:py-20">
+    <section className="bg-muted/50 py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-20">
           <Reveal>
@@ -32,24 +28,13 @@ export function HowItWorksSection() {
               {HOW_IT_WORKS_CONTENT.eyebrow}
             </span>
 
-            <p className="text-foreground mt-6 text-3xl leading-snug font-medium text-balance md:text-4xl">
+            <h2 className="text-foreground mt-6 text-3xl leading-snug font-medium text-balance md:text-4xl">
               {HOW_IT_WORKS_CONTENT.headingLead}{" "}
               <span className="bg-foreground/10 rounded px-1.5 py-0.5">
                 {HOW_IT_WORKS_CONTENT.headingHighlight}
               </span>
               {HOW_IT_WORKS_CONTENT.headingRest}
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" asChild>
-                <Link href={AUTH_ROUTES.signUp}>{HOW_IT_WORKS_CONTENT.primaryCta}</Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href={GITHUB_URL} target="_blank" rel="noreferrer">
-                  {HOW_IT_WORKS_CONTENT.secondaryCta}
-                </Link>
-              </Button>
-            </div>
+            </h2>
           </Reveal>
 
           <Reveal delay={100} className="grid grid-cols-2 gap-x-10 gap-y-6">

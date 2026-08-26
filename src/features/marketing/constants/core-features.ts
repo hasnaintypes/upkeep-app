@@ -1,12 +1,5 @@
 import type { CoreFeature } from "../types";
 
-export const CORE_FEATURES_CONTENT = {
-  headingLead: "Core",
-  headingRest: "Features",
-  primaryCta: "Get started free",
-  secondaryCta: "Read the docs",
-};
-
 /** The fuller real feature set (checks, alerting, notification channels,
  * host compatibility, hosting cost) already established elsewhere on this
  * page/in the FAQ -- not new claims invented for this section. */

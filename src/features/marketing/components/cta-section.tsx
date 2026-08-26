@@ -13,7 +13,7 @@ import { Reveal } from "./reveal";
  */
 export function CTASection() {
   return (
-    <section className="bg-muted/50 py-16 md:py-20">
+    <section className="bg-muted/50 py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-6">
         <Reveal className="mx-auto max-w-4xl text-center">
           <h2 className="text-4xl font-semibold tracking-tight text-balance lg:text-5xl xl:text-6xl">

@@ -1,7 +1,6 @@
 import {
   CTASection,
   ContentSection,
-  CoreFeaturesSection,
   FAQSection,
   FeaturesSection,
   HeroSection,
@@ -15,7 +14,6 @@ export default function Home() {
       <HeroSection />
       <SupportedHostsSection />
       <HowItWorksSection />
-      <CoreFeaturesSection />
       <FeaturesSection />
       <ContentSection />
       <FAQSection />
