@@ -8,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { incidentFilterHref } from "../lib/incident-filters";
+import type { GlobalIncidentFilters } from "../types";
 
 const ALL_VALUE = "__all__";
 
@@ -24,19 +26,29 @@ const ALL_VALUE = "__all__";
  * immediate (not debounced) since selecting an option is already a
  * complete, deliberate action, unlike the free-text search box's
  * keystroke-by-keystroke typing (`OverviewSearchInput`).
+ *
+ * Takes plain serializable props (`pathname`/`filters`/`filterKey`) and
+ * calls `incidentFilterHref` itself rather than accepting an `hrefFor`
+ * callback prop -- functions can't cross the Server->Client Component
+ * boundary, and `IncidentFilterBar` (this component's only caller) has no
+ * other reason to be a Client Component itself.
  */
 export function IncidentFilterSelect({
   label,
   value,
   placeholder,
   options,
-  hrefFor,
+  pathname,
+  filters,
+  filterKey,
 }: {
   label: string;
   value: string | null;
   placeholder: string;
   options: { value: string; label: string }[];
-  hrefFor: (value: string | null) => string;
+  pathname: string;
+  filters: GlobalIncidentFilters;
+  filterKey: "projectId" | "status" | "since";
 }) {
   const router = useRouter();
 
@@ -44,7 +56,10 @@ export function IncidentFilterSelect({
     <Select
       value={value ?? ALL_VALUE}
       onValueChange={(next) => {
-        router.push(hrefFor(next === ALL_VALUE ? null : next), { scroll: false });
+        const nextValue = next === ALL_VALUE ? null : next;
+        router.push(incidentFilterHref(pathname, filters, filterKey, nextValue), {
+          scroll: false,
+        });
       }}
     >
       <SelectTrigger size="sm" aria-label={label} className="w-auto min-w-40">
