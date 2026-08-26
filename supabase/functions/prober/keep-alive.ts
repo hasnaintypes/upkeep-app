@@ -24,6 +24,25 @@
 // outside try_acquire_prober_lock (that lock exists solely to stop the
 // monitoring batch from double-processing the same due-project list, a
 // concern that doesn't apply here).
+//
+// #50's decision, spelled out explicitly (its own acceptance criterion):
+// keep-alive results are NOT written to `checks` at all -- not written and
+// tagged/flagged as excludable. There is no `is_keep_alive` column or
+// similar on `checks`; this module simply has no code path that inserts
+// into `checks` or `incidents` in the first place (contrast with
+// index.ts's monitoring path, which explicitly threads persist.ts's and
+// incidents.ts's results through). That structural absence is what makes
+// keep-alive-only pings incapable of producing an incident (#35) or a
+// notifier dispatch (#40, which only ever polls the `incidents` table,
+// never `checks` or this module) -- see keep-alive.test.ts's "(#50)"-
+// labeled tests, which assert the fake client's `.from()` is only ever
+// called with "projects", never "checks"/"incidents", including when the
+// ping itself fails. A project with both `is_active` and
+// `keep_alive_enabled` true is simply run through both this module and
+// index.ts's monitoring path independently on their own separate
+// schedules (`last_keep_alive_at` vs. `checks.checked_at`/
+// `check_interval_seconds`) -- there is no shared state between them for
+// one to "double-count" into, by construction.
 import { runHealthChecks, type DueProject } from "./check.ts";
 
 /** The minimal shape this module needs from a Supabase client -- mirrors

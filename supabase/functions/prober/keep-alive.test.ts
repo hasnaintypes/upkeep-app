@@ -21,26 +21,32 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
 function fakeClient(dueProjects: DueProject[]): {
   client: KeepAliveClient;
   rpcCalledWith: string[];
+  fromCalledWith: string[];
   updatedIds: string[][];
 } {
   const rpcCalledWith: string[] = [];
+  const fromCalledWith: string[] = [];
   const updatedIds: string[][] = [];
   return {
     rpcCalledWith,
+    fromCalledWith,
     updatedIds,
     client: {
       rpc: (fn: string) => {
         rpcCalledWith.push(fn);
         return Promise.resolve({ data: dueProjects, error: null });
       },
-      from: (_table: string) => ({
-        update: (_values: Record<string, unknown>) => ({
-          in: (_column: string, ids: string[]) => {
-            updatedIds.push(ids);
-            return Promise.resolve({ error: null });
-          },
-        }),
-      }),
+      from: (table: string) => {
+        fromCalledWith.push(table);
+        return {
+          update: (_values: Record<string, unknown>) => ({
+            in: (_column: string, ids: string[]) => {
+              updatedIds.push(ids);
+              return Promise.resolve({ error: null });
+            },
+          }),
+        };
+      },
     },
   };
 }
@@ -114,6 +120,50 @@ Deno.test("runKeepAlivePings: still stamps last_keep_alive_at even when the ping
   assertEquals(summary, { count: 1, pinged_project_ids: ["a"], error: null });
   assertEquals(updatedIds, [["a"]]);
 });
+
+Deno.test(
+  "runKeepAlivePings: a failing ping never touches checks/incidents -- only .from(\"projects\") is ever called (#50)",
+  async () => {
+    const projects = [fakeProject({ id: "a" })];
+    const { client, fromCalledWith } = fakeClient(projects);
+
+    // A 500 (not just a network error) is enough to prove the point -- see
+    // this module's own top comment: keep-alive intentionally has no
+    // knowledge of expected_status/classification at all, so there is no
+    // code path here that could react to "this ping failed" by writing a
+    // `checks` row or evaluating an incident streak, unlike the monitoring
+    // pipeline's check.ts -> classify.ts -> persist.ts -> incidents.ts.
+    await withFakeFetch(
+      () => new Response("server error", { status: 500 }),
+      () => runKeepAlivePings(client),
+    );
+
+    assertEquals(fromCalledWith, ["projects"]);
+  },
+);
+
+Deno.test(
+  "runKeepAlivePings: a network-level failure (fetch rejects) still never touches checks/incidents (#50)",
+  async () => {
+    const projects = [fakeProject({ id: "a" })];
+    const { client, fromCalledWith } = fakeClient(projects);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() =>
+      Promise.reject(new Error("network error"))) as typeof fetch;
+
+    try {
+      const summary = await runKeepAlivePings(client);
+      // check.ts's runHealthCheck catches this internally (never rejects),
+      // so runKeepAlivePings still completes normally and stamps
+      // last_keep_alive_at -- there is no error path here that reaches for
+      // the `checks`/`incidents` tables.
+      assertEquals(summary, { count: 1, pinged_project_ids: ["a"], error: null });
+      assertEquals(fromCalledWith, ["projects"]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+);
 
 Deno.test("runKeepAlivePings: never throws when the RPC returns an error", async () => {
   const failingClient: KeepAliveClient = {
