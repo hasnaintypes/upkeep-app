@@ -1,0 +1,40 @@
+---
+title: Troubleshooting
+description: Common issues and what to check first.
+---
+
+# Troubleshooting
+
+## A project shows "unknown" instead of up/down
+
+`unknown` means the check itself couldn't run (not that the target
+responded badly). Check that the health-check URL is reachable from the
+public internet -- `http://localhost` targets only work while developing
+locally, never in production.
+
+## I'm not getting notified about an incident
+
+Walk through, in order:
+
+1. Is a notification channel actually attached to that project? Channels
+   exist independently of projects until attached via a rule.
+2. Is the rule muted, or set to **digest only**? A digest-only rule
+   deliberately doesn't send per-incident alerts.
+3. Has the escalation threshold been reached? A single failed check doesn't
+   open an incident by itself if the threshold is higher than 1.
+4. For email/webhook channels, check the channel's saved config value is
+   still correct -- it's masked after saving and can only be replaced, not
+   inspected.
+
+## Bulk import rows are failing
+
+Each row is validated with the same rules as the single "Add project" form.
+The most common causes are a non-`https://` health check URL, or a
+`health_url` that duplicates an existing project's -- duplicates are still
+imported, just flagged with a warning rather than blocked.
+
+## The app runs but I can't sign in
+
+If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` aren't
+set, auth is silently disabled rather than erroring -- see
+[Configuration](/docs/configuration).

@@ -1,0 +1,57 @@
+---
+title: Projects & Health Checks
+description: What each project field controls, and how a check is classified.
+---
+
+# Projects & Health Checks
+
+A project is one thing Upkeep monitors: a name, a health-check URL, and how
+often to check it. Add one from the dashboard's **Add project** button, or
+import several at once from the same sheet.
+
+## Fields
+
+| Field | Meaning |
+| --- | --- |
+| Name | Display name shown across the dashboard. |
+| Description | Optional free text. |
+| Health check URL | Must be `https://` (or `http://localhost` while developing). This is what gets pinged. |
+| Method | `GET`, `POST`, or `HEAD`. |
+| Request body | Sent with non-`GET` requests, e.g. `{"ping": true}`. |
+| Expected status | HTTP status code (100-599) that counts as "up". |
+| Check interval | How often to check, from every 30 seconds up to once a day. |
+| Timeout | How long to wait before a check counts as failed (1-120 seconds). |
+| Hosting provider | Optional label (Render, Railway, Vercel, ...). |
+| Collection | Optional grouping ("folder") -- projects without one show under Uncategorized. |
+| Tags | Optional, comma-separated. |
+| Custom headers | Optional bearer tokens / headers sent with each check, added after creating the project. |
+
+## Bulk import
+
+The **Add project** sheet has an import section above the single-project
+form: upload a `.csv` or `.json` file to create several projects at once.
+
+- **Required columns/keys:** `name`, `health_url`.
+- **Optional:** `description`, `method`, `expected_status`,
+  `check_interval_seconds`, `timeout_ms`, `hosting_provider`, `collection`,
+  `tags`.
+- In CSV, separate multiple `tags` with `;` (not `,`, since that's the CSV
+  delimiter).
+- Custom headers / bearer tokens aren't supported via import -- add those
+  individually after creating a project.
+
+Each row is created independently and reported with its own success/failure,
+so one bad row doesn't block the rest.
+
+## How a check is classified
+
+Each check comes back as one of:
+
+- **up** -- responded with the expected status within the timeout.
+- **down** -- didn't respond, timed out, or returned an unexpected status.
+- **degraded** -- responded, but slowly or with a borderline result.
+- **waking** -- consistent with a free-tier host spinning up from idle.
+- **unknown** -- the check itself couldn't run.
+
+A project going from up to down opens an incident (see
+[Notifications](/docs/notifications) for how that's escalated and alerted).

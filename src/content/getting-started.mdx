@@ -1,0 +1,66 @@
+---
+title: Getting Started
+description: Deploy Upkeep and register your first project.
+---
+
+# Getting Started
+
+## 1. Create a Supabase project
+
+Upkeep uses Supabase for auth, storage, and the scheduled health-check
+functions. Create a free project at [supabase.com](https://supabase.com),
+then note its project URL and publishable (anon) key from
+**Project Settings → API**.
+
+## 2. Deploy the dashboard
+
+Clone the repository and deploy it to Vercel, Netlify, or any host that runs
+Next.js:
+
+```bash
+git clone https://github.com/hasnaintypes/upkeep-app.git
+cd upkeep-app
+pnpm install
+```
+
+Copy `.env.example` to `.env.local` and fill in your Supabase project's
+values:
+
+```bash
+cp .env.example .env.local
+```
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+```
+
+<Callout type="warning" title="Public env vars">
+  Only these two variables are meant to be public. Anything else -- service
+  role keys, notification channel secrets -- stays server-only and is never
+  read from a `NEXT_PUBLIC_*` variable.
+</Callout>
+
+Then start the dev server:
+
+```bash
+pnpm dev
+```
+
+## 3. Apply the database schema
+
+The database schema lives in `supabase/migrations/` and is applied via the
+Supabase CLI (pinned as a dev dependency, so run it through `pnpm` rather
+than a global install):
+
+```bash
+pnpm supabase login
+pnpm supabase link --project-ref <your-project-ref>
+pnpm supabase db push
+```
+
+## 4. Create an account and add a project
+
+Sign up from the deployed app, then add your first project from the
+dashboard: a name, a health-check URL, and how often to check it. See
+[Projects & Health Checks](/docs/projects) for every field's meaning.

@@ -1,0 +1,38 @@
+---
+title: Introduction
+description: What Upkeep is and who it's for.
+---
+
+# Upkeep
+
+Upkeep is a self-hosted uptime and health monitor for personal and portfolio
+projects running on free-tier hosts (Render, Railway, Fly.io, Vercel, and
+similar).
+
+Free-tier hosts spin down idle services. The next visitor to a live demo
+eats a slow cold start, or the project just looks broken. Upkeep pings each
+project's health endpoint on a schedule, keeps services warm, and gives you
+one dashboard instead of N different host dashboards to check.
+
+<Callout type="tip" title="New here?">
+  Start with [Getting Started](/docs/getting-started) to deploy Upkeep and
+  register your first project.
+</Callout>
+
+## What it does
+
+- **Health checks** -- periodically requests each project's health endpoint
+  and classifies the result (up, down, degraded, waking, unknown).
+- **Incidents** -- opens an incident when a project goes down, tracks how
+  long it stays down, and resolves it automatically once checks recover.
+- **Notifications** -- alerts a Discord webhook, email, or generic webhook
+  when a project's status changes, with configurable escalation thresholds
+  and optional daily/weekly digests instead of per-incident noise.
+- **Dashboard** -- response-time graphs, uptime heatmaps, and a searchable
+  incident history across every project you own.
+
+## Stack
+
+Upkeep's backend is Supabase (Postgres, Edge Functions, scheduled triggers)
+and its frontend is a Next.js dashboard, deployable independently of the
+backend on Vercel, Netlify, or similar.

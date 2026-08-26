@@ -1,0 +1,44 @@
+---
+title: Configuration
+description: Environment variables and what each one is for.
+---
+
+# Configuration
+
+All configuration is environment variables -- there's no separate settings
+file. See `.env.example` in the repository root for the full list.
+
+## Client-safe
+
+These two are the only variables meant to be public (`NEXT_PUBLIC_*`):
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project's URL. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase's publishable (anon) key. |
+
+If these are unset, the app still runs, but auth is disabled -- useful for
+working on marketing/UI changes without a Supabase project configured.
+
+## Server-only
+
+<Callout type="danger" title="Never expose these to the client">
+  Neither of these should ever be prefixed with `NEXT_PUBLIC_` or passed into
+  a Client Component's props.
+</Callout>
+
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS for trusted server-side code, e.g. programmatic project registration via a per-user API key. |
+| `SUPABASE_SECRET_KEY` | Invokes deployed Edge Functions that require `auth: "secret"` (the prober's manual "run check now" path, and scheduled triggers). |
+
+## Database schema
+
+The schema itself is version-controlled, not dashboard-authored:
+`supabase/migrations/` is the source of truth, applied via the Supabase CLI:
+
+```bash
+pnpm supabase migration new <name>   # create a new migration
+pnpm supabase db push --dry-run      # preview what would apply
+pnpm supabase db push                # apply it
+```

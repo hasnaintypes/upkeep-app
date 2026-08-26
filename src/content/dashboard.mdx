@@ -1,0 +1,40 @@
+---
+title: Dashboard
+description: A tour of the Overview, Projects, and Incidents pages.
+---
+
+# Dashboard
+
+## Overview
+
+A single view across every active project: current status, recent
+incidents, and quick filters by tag, provider, or status.
+
+## Projects
+
+Every project you own, grouped by collection, with per-project actions:
+
+- **Run check now** -- triggers an immediate health check outside the
+  normal schedule and shows the result inline.
+- **Pause / resume** -- stops or restarts scheduled checks without deleting
+  the project's history.
+- **Edit** -- opens the same sheet used to add a project, pre-filled.
+- **Delete** -- permanently removes the project and everything derived from
+  it (checks, incidents, notification rules). This can't be undone.
+
+## Project detail
+
+Each project's own page has:
+
+- A response-time graph across configurable windows (24h/7d/30d/90d).
+- An uptime heatmap.
+- Incident history with an editable note per incident (e.g. "host
+  maintenance" or a link to the fix).
+- The raw check log.
+- That project's attached notification rules.
+
+## Incidents
+
+Every incident across every project you own, most recent first, filterable
+by project, status, and time range -- the same per-incident data as each
+project's own incident history, just not scoped to one project.

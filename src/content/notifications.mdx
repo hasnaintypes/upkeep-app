@@ -1,0 +1,48 @@
+---
+title: Notifications
+description: Channels, escalation thresholds, muting, and digests.
+---
+
+# Notifications
+
+Notifications have two parts: **channels** (where alerts go, managed on the
+Notifications page) and **rules** (which channels are attached to which
+project, managed on each project's detail page).
+
+## Channels
+
+Create a channel once, then attach it to as many projects as you want.
+Supported channel types:
+
+- **Discord** -- a Discord webhook URL.
+- **Email** -- a destination email address.
+- **Webhook** -- a generic outgoing webhook URL for your own integration.
+
+A channel's type can't be changed after creation -- delete and re-add it
+instead. Its config value is masked once saved and can only be replaced, not
+viewed again.
+
+## Attaching a channel to a project
+
+From a project's detail page, attach any existing channel and set:
+
+- **Escalation threshold** -- how many consecutive failed checks before an
+  incident actually triggers a notification, so one transient blip doesn't
+  page you.
+- **Digest only** -- when on, this rule doesn't fire per-incident alerts at
+  all; it only contributes to that channel's periodic digest instead (see
+  below).
+- **Muted** -- temporarily silences this rule without detaching the channel.
+
+## Digests
+
+Instead of (or in addition to) per-incident alerts, a channel can receive a
+daily or weekly digest summarizing every project's status over that period.
+Set a rule to **digest only** and choose the digest frequency to use this
+instead of immediate alerts.
+
+<Callout type="note">
+  Digest delivery runs on its own schedule, independent of the per-project
+  check interval -- a daily digest goes out once a day regardless of how
+  often each project is individually checked.
+</Callout>
