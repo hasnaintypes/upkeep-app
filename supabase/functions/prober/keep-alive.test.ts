@@ -1,0 +1,161 @@
+// Unit tests for keep-alive.ts, using a fake KeepAliveClient and a stubbed
+// global `fetch` -- no real Supabase project or network calls needed.
+import { assertEquals } from "@std/assert";
+import { runKeepAlivePings, type KeepAliveClient } from "./keep-alive.ts";
+import type { DueProject } from "./check.ts";
+
+function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
+  return {
+    id: "test-project",
+    health_url: "https://example.com/health",
+    method: "GET",
+    headers: {},
+    timeout_ms: 5000,
+    body: null,
+    retry_count: 1,
+    expected_status: 200,
+    ...overrides,
+  };
+}
+
+function fakeClient(dueProjects: DueProject[]): {
+  client: KeepAliveClient;
+  rpcCalledWith: string[];
+  updatedIds: string[][];
+} {
+  const rpcCalledWith: string[] = [];
+  const updatedIds: string[][] = [];
+  return {
+    rpcCalledWith,
+    updatedIds,
+    client: {
+      rpc: (fn: string) => {
+        rpcCalledWith.push(fn);
+        return Promise.resolve({ data: dueProjects, error: null });
+      },
+      from: (_table: string) => ({
+        update: (_values: Record<string, unknown>) => ({
+          in: (_column: string, ids: string[]) => {
+            updatedIds.push(ids);
+            return Promise.resolve({ error: null });
+          },
+        }),
+      }),
+    },
+  };
+}
+
+/** Temporarily replaces globalThis.fetch for the duration of `run`, always
+ * restoring the original afterward even if `run` throws -- same helper
+ * shape as manual-check.test.ts's own `withFakeFetch`. */
+async function withFakeFetch<T>(
+  fakeResponse: () => Response,
+  run: () => Promise<T>,
+): Promise<T> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.resolve(fakeResponse())) as typeof fetch;
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+Deno.test("runKeepAlivePings: calls get_due_keep_alive_projects", async () => {
+  const { client, rpcCalledWith } = fakeClient([]);
+  await runKeepAlivePings(client);
+  assertEquals(rpcCalledWith, ["get_due_keep_alive_projects"]);
+});
+
+Deno.test("runKeepAlivePings: no due projects -> no fetch, no update, count 0", async () => {
+  const { client, updatedIds } = fakeClient([]);
+  let fetchCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => {
+    fetchCalled = true;
+    return Promise.resolve(new Response("ok"));
+  }) as typeof fetch;
+
+  try {
+    const summary = await runKeepAlivePings(client);
+    assertEquals(summary, { count: 0, pinged_project_ids: [], error: null });
+    assertEquals(fetchCalled, false);
+    assertEquals(updatedIds.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runKeepAlivePings: pings every due project and stamps last_keep_alive_at for all of them", async () => {
+  const projects = [fakeProject({ id: "a" }), fakeProject({ id: "b" })];
+  const { client, updatedIds } = fakeClient(projects);
+
+  const summary = await withFakeFetch(
+    () => new Response("ok", { status: 200 }),
+    () => runKeepAlivePings(client),
+  );
+
+  assertEquals(summary, { count: 2, pinged_project_ids: ["a", "b"], error: null });
+  assertEquals(updatedIds, [["a", "b"]]);
+});
+
+Deno.test("runKeepAlivePings: still stamps last_keep_alive_at even when the ping itself fails", async () => {
+  const projects = [fakeProject({ id: "a" })];
+  const { client, updatedIds } = fakeClient(projects);
+
+  const summary = await withFakeFetch(
+    () => new Response("server error", { status: 500 }),
+    () => runKeepAlivePings(client),
+  );
+
+  // A keep-alive ping isn't gated on a successful/expected response the way
+  // a monitoring check is -- the attempt itself is what matters, so the
+  // project is still marked pinged and due-ness still advances.
+  assertEquals(summary, { count: 1, pinged_project_ids: ["a"], error: null });
+  assertEquals(updatedIds, [["a"]]);
+});
+
+Deno.test("runKeepAlivePings: never throws when the RPC returns an error", async () => {
+  const failingClient: KeepAliveClient = {
+    rpc: () => Promise.resolve({ data: null, error: { message: "connection reset" } }),
+    from: () => ({
+      update: () => ({ in: () => Promise.resolve({ error: null }) }),
+    }),
+  };
+
+  const summary = await runKeepAlivePings(failingClient);
+  assertEquals(summary, { count: 0, pinged_project_ids: [], error: "connection reset" });
+});
+
+Deno.test("runKeepAlivePings: reports the update error but keeps the pinged ids/count when the stamp write fails", async () => {
+  const projects = [fakeProject({ id: "a" })];
+  const client: KeepAliveClient = {
+    rpc: () => Promise.resolve({ data: projects, error: null }),
+    from: () => ({
+      update: () => ({
+        in: () => Promise.resolve({ error: { message: "write failed" } }),
+      }),
+    }),
+  };
+
+  const summary = await withFakeFetch(
+    () => new Response("ok", { status: 200 }),
+    () => runKeepAlivePings(client),
+  );
+
+  assertEquals(summary, { count: 1, pinged_project_ids: ["a"], error: "write failed" });
+});
+
+Deno.test("runKeepAlivePings: never throws when the client itself throws synchronously", async () => {
+  const throwingClient: KeepAliveClient = {
+    rpc: () => {
+      throw new Error("unexpected");
+    },
+    from: () => ({
+      update: () => ({ in: () => Promise.resolve({ error: null }) }),
+    }),
+  };
+
+  const summary = await runKeepAlivePings(throwingClient);
+  assertEquals(summary, { count: 0, pinged_project_ids: [], error: "unexpected" });
+});

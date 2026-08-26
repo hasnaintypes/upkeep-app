@@ -312,6 +312,7 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          last_keep_alive_at: string | null
           last_manual_check_at: string | null
           method: string
           name: string
@@ -335,6 +336,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          last_keep_alive_at?: string | null
           last_manual_check_at?: string | null
           method?: string
           name: string
@@ -358,6 +360,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           keep_alive_enabled?: boolean
+          last_keep_alive_at?: string | null
           last_manual_check_at?: string | null
           method?: string
           name?: string
@@ -381,6 +384,39 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_due_keep_alive_projects: {
+        Args: never
+        Returns: {
+          body: string | null
+          check_interval_seconds: number
+          collection: string | null
+          created_at: string
+          description: string | null
+          expected_body_match: string | null
+          expected_status: number
+          headers: Json | null
+          health_url: string
+          hosting_provider: string | null
+          id: string
+          is_active: boolean
+          keep_alive_enabled: boolean
+          last_keep_alive_at: string | null
+          last_manual_check_at: string | null
+          method: string
+          name: string
+          retry_count: number
+          tags: string[] | null
+          timeout_ms: number
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_due_projects: {
         Args: never
         Returns: {
@@ -397,6 +433,7 @@ export type Database = {
           id: string
           is_active: boolean
           keep_alive_enabled: boolean
+          last_keep_alive_at: string | null
           last_manual_check_at: string | null
           method: string
           name: string

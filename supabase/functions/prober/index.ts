@@ -1,5 +1,5 @@
-// Prober Edge Function -- entry point (PRD §5.2/§5.4, Phase 3/5, issues
-// #20-#28, #35-#36).
+// Prober Edge Function -- entry point (PRD §5.2/§5.4/§5.8, Phase 3/5/7,
+// issues #20-#28, #35-#36, #48).
 //
 // Two request shapes, both POSTed here:
 //   `{}`                  -- the scheduled batch tick (pg_cron, every minute).
@@ -21,12 +21,26 @@
 // inspectable without needing to separately query the `checks`/`incidents`
 // tables after every manual invocation.
 //
+// Keep-alive path (#48, batch tick only -- see keep-alive.ts's own module
+// comment for the full rationale): runs unconditionally on every batch
+// invocation, entirely independent of the monitoring pipeline above -- its
+// own due-project query (get_due_keep_alive_projects(), keyed off
+// keep_alive_enabled, not is_active/check_interval_seconds) and its own
+// due-ness tracking column (projects.last_keep_alive_at, not the `checks`
+// table), so a keep-alive ping never writes a `checks` row or feeds
+// incident detection. Runs before the monitoring lock/pipeline below and
+// isn't gated by it -- see the "Overlap protection" note.
+//
 // Manual path (#28): reuses the exact same check/retry/classify/persist
 // modules for one project id handed to it directly, instead of asking
 // get_due_projects() -- see manual-check.ts's own module comment for why it
-// deliberately skips the batch lock and self-monitoring below.
+// deliberately skips the batch lock and self-monitoring below. Does not run
+// the keep-alive path either -- that's an automatic background schedule,
+// not something a manual "run check now" click should trigger.
 //
-// Overlap protection (#26, batch path only): try_acquire_prober_lock()
+// Overlap protection (#26, monitoring batch path only -- see keep-alive.ts
+// for why the keep-alive path above deliberately isn't covered by this same
+// lock): try_acquire_prober_lock()
 // claims a single-row mutex (see the schedule_prober_cron migration for why
 // this is a claimable table row, not a session-scoped pg_advisory_lock --
 // the latter wouldn't reliably span the several separate PostgREST calls
@@ -68,6 +82,7 @@ import { recordProberSuccess } from "./self-monitor.ts";
 import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { InsertableClient } from "./persist.ts";
 import { maybeOpenIncidents, maybeResolveIncidents, type IncidentClient } from "./incidents.ts";
+import { runKeepAlivePings, type KeepAliveClient } from "./keep-alive.ts";
 
 /** Reads an optional `project_id` out of the request body. Malformed/empty
  * bodies (including pg_cron's literal `{}`) resolve to `null`, not a thrown
@@ -97,15 +112,27 @@ const prober = {
       );
     }
 
+    // #48: runs on every batch tick, independent of the monitoring lock/
+    // pipeline below (including the `!acquired` skip branch) -- see
+    // keep-alive.ts's module comment for why. Never throws/rejects, so a
+    // keep-alive failure can't prevent the monitoring batch from running.
+    const keepAlive = await runKeepAlivePings(
+      ctx.supabaseAdmin as unknown as KeepAliveClient,
+    );
+
     const { data: acquired, error: lockError } = await ctx.supabaseAdmin.rpc(
       "try_acquire_prober_lock",
     );
 
     if (lockError) {
-      return Response.json({ error: lockError.message }, { status: 500 });
+      return Response.json({ error: lockError.message, keep_alive: keepAlive }, { status: 500 });
     }
     if (!acquired) {
-      return Response.json({ skipped: true, reason: "previous run still in progress" });
+      return Response.json({
+        skipped: true,
+        reason: "previous run still in progress",
+        keep_alive: keepAlive,
+      });
     }
 
     try {
@@ -114,7 +141,7 @@ const prober = {
       );
 
       if (error) {
-        return Response.json({ error: error.message }, { status: 500 });
+        return Response.json({ error: error.message, keep_alive: keepAlive }, { status: 500 });
       }
 
       const projects = (dueProjects ?? []) as unknown as DueProject[];
@@ -166,6 +193,7 @@ const prober = {
           persist_error: persistedById.get(result.project_id)?.error ?? null,
           incident: incidentByProjectId.get(result.project_id) ?? null,
         })),
+        keep_alive: keepAlive,
       });
     } finally {
       const { error: releaseError } = await ctx.supabaseAdmin.rpc(
