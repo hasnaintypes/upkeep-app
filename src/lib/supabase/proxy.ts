@@ -47,11 +47,19 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
+  // `/api/*` is excluded here: those routes are for programmatic,
+  // non-browser callers with no Supabase session cookie by design (e.g.
+  // POST /api/projects/register, #19/#47, authenticated by its own API key
+  // inside the route handler, not a session). Without this exclusion every
+  // such request was silently 307-redirected to /auth/login before ever
+  // reaching the route, regardless of what credential it presented --
+  // discovered while verifying #47 end-to-end.
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
+    !request.nextUrl.pathname.startsWith("/auth") &&
+    !request.nextUrl.pathname.startsWith("/api")
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();

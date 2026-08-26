@@ -2,7 +2,14 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { BellIcon, CirclePower, FolderIcon, LayoutDashboardIcon, SirenIcon } from "lucide-react";
+import {
+  BellIcon,
+  CirclePower,
+  FolderIcon,
+  KeyRoundIcon,
+  LayoutDashboardIcon,
+  SirenIcon,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +27,7 @@ const NAV_MAIN_ITEMS: NavMainItem[] = [
   { title: "Projects", url: "/dashboard/projects", icon: FolderIcon },
   { title: "Incidents", url: "/dashboard/incidents", icon: SirenIcon },
   { title: "Notifications", url: "/dashboard/notifications", icon: BellIcon },
+  { title: "API Keys", url: "/dashboard/api-keys", icon: KeyRoundIcon },
 ];
 
 /**

@@ -10,6 +10,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 const PAGE_TITLES: { prefix: string; title: string }[] = [
   { prefix: "/dashboard/projects", title: "Projects" },
   { prefix: "/dashboard/notifications", title: "Notifications" },
+  { prefix: "/dashboard/api-keys", title: "API Keys" },
   { prefix: "/dashboard", title: "Overview" },
 ];
 

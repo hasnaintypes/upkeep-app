@@ -50,13 +50,12 @@ Copy `.env.example` to `.env.local` and set:
 If left unset, Supabase auth silently no-ops (`hasEnvVars` in `src/lib/utils.ts`) — the app still
 boots and the marketing pages work, but sign in/up and protected routes won't function.
 
-Only needed for `POST /api/projects/register` (programmatic project registration):
+Only needed for `POST /api/projects/register` (programmatic project registration, authenticated
+by a per-user API key generated from `/dashboard/api-keys` — see `src/features/api-keys/`):
 
 | Variable | Description |
 | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (Project Settings → API) — server-only, bypasses RLS. Never expose to the client. |
-| `UPKEEP_REGISTRATION_SECRET` | Shared secret sent as `Authorization: Bearer <secret>`. v1 stub auth pending Phase 6 per-user API keys — see the route's module comment. |
-| `UPKEEP_REGISTRATION_OWNER_USER_ID` | The `auth.users.id` (uuid) that programmatically registered projects are owned by. |
 
 Needed to invoke Edge Functions that require `auth: "secret"` (e.g. `supabase/functions/prober`) —
 from the "run check now" Server Action (`src/features/projects/lib/run-check.ts`), a `pg_cron`
