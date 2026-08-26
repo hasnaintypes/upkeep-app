@@ -27,6 +27,7 @@ import {
 // `signOut`/`AUTH_ROUTES` are both plain client-safe modules on their own.
 import { AUTH_ROUTES } from "@/features/auth/constants/routes";
 import { signOut } from "@/features/auth/lib/actions";
+import { notify } from "@/lib/toast";
 
 /** First letter of the email, uppercased -- there's no display name/avatar
  * upload feature in this app, so an initial is the only thing to show
@@ -49,7 +50,11 @@ export function NavUser({ email }: { email: string }) {
   const router = useRouter();
 
   async function handleLogout() {
-    await signOut();
+    const { error } = await signOut();
+    if (error) {
+      notify.error("Couldn't log out", error.message);
+      return;
+    }
     router.push(AUTH_ROUTES.login);
   }
 

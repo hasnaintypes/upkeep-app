@@ -14,6 +14,7 @@ import { BRAND_NAME } from "@/features/marketing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { notify } from "@/lib/toast";
 import { updatePassword } from "../lib/actions";
 import { DEFAULT_AUTHENTICATED_REDIRECT } from "../constants/routes";
 
@@ -34,10 +35,13 @@ export function UpdatePasswordForm({
     try {
       const { error } = await updatePassword(password);
       if (error) throw error;
+      notify.success("Password updated");
       // Update this route to redirect to an authenticated route. The user already has an active session.
       router.push(DEFAULT_AUTHENTICATED_REDIRECT);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const message = error instanceof Error ? error.message : "An error occurred";
+      setError(message);
+      notify.error("Couldn't update password", message);
     } finally {
       setIsLoading(false);
     }

@@ -15,6 +15,7 @@ import { BRAND_NAME } from "@/features/marketing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { notify } from "@/lib/toast";
 import { signUpWithPassword } from "../lib/actions";
 import { AUTH_ROUTES, DEFAULT_AUTHENTICATED_REDIRECT } from "../constants/routes";
 
@@ -36,6 +37,7 @@ export function SignUpForm({
 
     if (password !== repeatPassword) {
       setError("Passwords do not match");
+      notify.error("Couldn't create account", "Passwords do not match.");
       setIsLoading(false);
       return;
     }
@@ -49,7 +51,9 @@ export function SignUpForm({
       if (error) throw error;
       router.push(AUTH_ROUTES.signUpSuccess);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const message = error instanceof Error ? error.message : "An error occurred";
+      setError(message);
+      notify.error("Couldn't create account", message);
     } finally {
       setIsLoading(false);
     }

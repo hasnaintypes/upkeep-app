@@ -15,6 +15,7 @@ import { BRAND_NAME } from "@/features/marketing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { notify } from "@/lib/toast";
 import { signInWithPassword } from "../lib/actions";
 import { AUTH_ROUTES, DEFAULT_AUTHENTICATED_REDIRECT } from "../constants/routes";
 
@@ -36,9 +37,12 @@ export function LoginForm({
     try {
       const { error } = await signInWithPassword(email, password);
       if (error) throw error;
+      notify.success("Welcome back");
       router.push(DEFAULT_AUTHENTICATED_REDIRECT);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const message = error instanceof Error ? error.message : "An error occurred";
+      setError(message);
+      notify.error("Couldn't log in", message);
     } finally {
       setIsLoading(false);
     }

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { BRAND_NAME } from "@/features/marketing";
 import Link from "next/link";
 import { useState } from "react";
+import { notify } from "@/lib/toast";
 import { resetPasswordForEmail } from "../lib/actions";
 import { AUTH_ROUTES } from "../constants/routes";
 
@@ -39,7 +40,9 @@ export function ForgotPasswordForm({
       if (error) throw error;
       setSuccess(true);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const message = error instanceof Error ? error.message : "An error occurred";
+      setError(message);
+      notify.error("Couldn't send reset email", message);
     } finally {
       setIsLoading(false);
     }

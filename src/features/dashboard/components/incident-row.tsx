@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { notify } from "@/lib/toast";
 import { updateIncidentCause } from "../lib/actions";
 import {
   formatIncidentDateTime,
@@ -58,10 +59,13 @@ export function IncidentRow({
     startTransition(async () => {
       const { data, error } = await updateIncidentCause(incident.id, draft);
       if (error || !data) {
-        setError(error ?? "Something went wrong.");
+        const message = error ?? "Something went wrong.";
+        setError(message);
+        notify.error("Couldn't save note", message);
         return;
       }
       onSaved(data);
+      notify.success("Note saved");
       setEditing(false);
     });
   }
