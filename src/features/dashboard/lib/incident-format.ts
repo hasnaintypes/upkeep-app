@@ -5,12 +5,30 @@
  * consistent and don't duplicate these pure functions.
  */
 
+/** Fixed locale/timeZone (rather than the runtime's own default) so this
+ * renders identically during SSR (Node, e.g. UTC) and client hydration
+ * (the visitor's browser, whatever locale/timezone that happens to be) --
+ * relying on `toLocaleString(undefined, ...)`'s defaults here caused a
+ * React hydration mismatch (error #418) on every incident timestamp, since
+ * a "use client" component's server-rendered output has to match the
+ * client's first render exactly. */
 export function formatIncidentDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+  });
+}
+
+/** Full date+time for `title` tooltips -- same fixed locale/timeZone
+ * rationale as `formatIncidentDateTime` above. */
+export function formatIncidentDateTimeFull(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "UTC",
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 }
 

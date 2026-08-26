@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { updateIncidentCause } from "../lib/actions";
-import { formatIncidentDateTime, formatIncidentDuration } from "../lib/incident-format";
+import {
+  formatIncidentDateTime,
+  formatIncidentDateTimeFull,
+  formatIncidentDuration,
+} from "../lib/incident-format";
 import { LiveIncidentDuration } from "./live-incident-duration";
 import type { Incident } from "../types";
 
@@ -85,13 +89,13 @@ export function IncidentRow({
         </TableCell>
         <TableCell
           className="text-muted-foreground"
-          title={new Date(incident.started_at).toLocaleString()}
+          title={formatIncidentDateTimeFull(incident.started_at)}
         >
           {formatIncidentDateTime(incident.started_at)}
         </TableCell>
         <TableCell
           className="hidden text-muted-foreground sm:table-cell"
-          title={incident.resolved_at ? new Date(incident.resolved_at).toLocaleString() : undefined}
+          title={incident.resolved_at ? formatIncidentDateTimeFull(incident.resolved_at) : undefined}
         >
           {incident.resolved_at ? formatIncidentDateTime(incident.resolved_at) : "—"}
         </TableCell>
