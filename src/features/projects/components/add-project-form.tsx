@@ -91,6 +91,7 @@ function toFormState(project?: Project): FormState {
     keep_alive_window_start: toTimeInputValue(project.keep_alive_window_start),
     keep_alive_window_end: toTimeInputValue(project.keep_alive_window_end),
     keep_alive_timezone: project.keep_alive_timezone ?? "",
+    is_public: project.is_public,
   };
 }
 
@@ -206,6 +207,7 @@ export function AddProjectForm({
           keep_alive_window_start,
           keep_alive_window_end,
           keep_alive_timezone,
+          is_public,
         } = result.data;
 
         const mainResult = await updateProject(project.id, {
@@ -225,6 +227,7 @@ export function AddProjectForm({
           keep_alive_window_start,
           keep_alive_window_end,
           keep_alive_timezone,
+          is_public,
         });
         if (mainResult.error || !mainResult.data) {
           const message = mainResult.error ?? "Something went wrong.";
@@ -634,6 +637,24 @@ export function AddProjectForm({
                     </Field>
                   </>
                 )}
+
+                <Field orientation="horizontal" className="w-auto gap-2">
+                  <FieldLabel htmlFor="is_public">Public status page</FieldLabel>
+                  <Switch
+                    id="is_public"
+                    checked={values.is_public}
+                    onCheckedChange={(checked) => updateField("is_public", checked)}
+                  />
+                </Field>
+                <FieldDescription className="-mt-2">
+                  Makes this project&apos;s current status, uptime %, and
+                  response-time history visible to anyone with the link at{" "}
+                  <code className="rounded-sm bg-muted px-1 py-0.5 text-xs">
+                    /status/{project?.id ?? "..."}
+                  </code>
+                  . The health check {values.check_type === "tcp" ? "target" : "URL"},
+                  custom headers, and any auth tokens are never included.
+                </FieldDescription>
               </FieldGroup>
             </AccordionContent>
           </AccordionItem>

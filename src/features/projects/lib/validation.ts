@@ -184,6 +184,15 @@ export const createProjectSchema = z.object({
   keep_alive_window_start: optionalTimeOfDay,
   keep_alive_window_end: optionalTimeOfDay,
   keep_alive_timezone: optionalTimezone,
+  // Opt-in public status page (PRD §5.6, Phase 8, #51/#52) -- defaults to
+  // false (PROJECT_DEFAULTS.isPublic), matching this app's owner-only-by-
+  // default posture everywhere else. No format validation needed here (it's
+  // a plain boolean); the actual gating (only the owner can flip it, only a
+  // public project's data is ever readable at /status/[id]) is enforced by
+  // the projects_update_own RLS policy and the get_public_project_*/
+  // is_project_publicly_visible() security definer functions, not this
+  // schema -- see supabase/migrations/*_add_public_status_pages.sql.
+  is_public: z.boolean().optional(),
 }).superRefine((values, ctx) => {
   const checkType = values.check_type ?? "http";
   const targetValidator = checkType === "tcp" ? tcpTargetSchema : healthUrlSchema;
@@ -257,4 +266,5 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   keep_alive_window_start: null,
   keep_alive_window_end: null,
   keep_alive_timezone: null,
+  is_public: PROJECT_DEFAULTS.isPublic,
 };

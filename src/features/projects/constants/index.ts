@@ -16,6 +16,7 @@ export const PROJECT_DEFAULTS = {
   isActive: true,
   keepAliveEnabled: false,
   checkType: "http",
+  isPublic: false,
 } as const;
 
 /** The two check types the prober supports (PRD §5.2, Phase 9, #55) --
