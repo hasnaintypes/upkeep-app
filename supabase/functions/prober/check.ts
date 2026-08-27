@@ -1,6 +1,7 @@
-// HTTP health-check execution (PRD §5.2, Phase 3, issues #21-#22).
+// Health-check execution (PRD §5.2, Phase 3, issues #21-#22; TCP check
+// type, Phase 9, issue #55).
 //
-// Scope note: this module only fires the request and captures the raw
+// Scope note: this module only fires the check and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
 // degraded/waking/unknown) or retry-on-failure, and doesn't write anything
 // to the `checks` table -- those are separate, later Phase 3 tasks per
@@ -13,10 +14,22 @@
 // flag on CheckResult, not just embedded in `error_message` text. A future
 // status-classification step should branch on `timed_out` directly rather
 // than string-matching the message (e.g. for "unknown" vs "down").
+//
+// #55's `check_type`: `runHealthCheck` below is a thin dispatcher over two
+// otherwise-independent runners, `runHttpCheck` (the original #21-#22
+// implementation, unchanged) and `runTcpCheck` (new). Both produce the same
+// `CheckResult` shape so classify.ts/retry.ts/persist.ts don't need to know
+// which kind of check produced it -- a TCP result simply always has
+// `http_status: null`/`response_snippet: null` (nothing to grade there),
+// exactly like an HTTP result that never got a response. See classify.ts's
+// own top comment for how `check_type` changes status classification
+// itself (no degraded/waking for a bare TCP check).
 
 /** The subset of a `projects` row this module needs. Kept minimal and
  * local rather than importing the Next.js app's generated Database type --
  * this Edge Function is a separate Deno runtime/module graph. */
+export type CheckType = "http" | "tcp";
+
 export type DueProject = {
   id: string;
   health_url: string;
@@ -26,6 +39,7 @@ export type DueProject = {
   body: string | null;
   retry_count: number;
   expected_status: number;
+  check_type: CheckType;
 };
 
 export type CheckResult = {
@@ -64,12 +78,38 @@ function toHeaderRecord(headers: unknown): Record<string, string> {
 }
 
 /**
+ * Parses `check_type = 'tcp'`'s overloaded `health_url` value as "host:port"
+ * (e.g. "db.example.com:5432") -- exported for direct unit testing
+ * (check.test.ts), and deliberately syntax-only: it does not resolve the
+ * host or attempt a connection, just like the app-side
+ * lib/validation.ts's tcpTargetSchema it mirrors (duplicated, not shared --
+ * see that file's own comment on why an Edge Function can't import from
+ * the Next.js app). Returns `null` for anything that isn't unambiguously
+ * "non-empty host, colon, 1-65535 port" -- `runTcpCheck` turns a `null`
+ * here into a regular (non-thrown) CheckResult failure, not an exception.
+ */
+export function parseTcpTarget(target: string): { hostname: string; port: number } | null {
+  const separatorIndex = target.lastIndexOf(":");
+  if (separatorIndex <= 0 || separatorIndex === target.length - 1) {
+    return null;
+  }
+
+  const hostname = target.slice(0, separatorIndex);
+  const port = Number(target.slice(separatorIndex + 1));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return null;
+  }
+
+  return { hostname, port };
+}
+
+/**
  * Fires one health-check HTTP request and captures its raw result. Never
  * throws -- every failure mode (network error, timeout, non-2xx status)
  * resolves to a CheckResult with `error_message` set instead, so a single
  * bad project can't take down a concurrent batch (see index.ts).
  */
-export async function runHealthCheck(project: DueProject): Promise<CheckResult> {
+async function runHttpCheck(project: DueProject): Promise<CheckResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), project.timeout_ms);
   const startedAt = performance.now();
@@ -125,6 +165,109 @@ export async function runHealthCheck(project: DueProject): Promise<CheckResult> 
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Opens a raw TCP connection to `check_type = 'tcp'`'s "host:port" target
+ * and captures whether it succeeded within `project.timeout_ms`. Never
+ * throws, same contract as `runHttpCheck` -- an unparseable target, a
+ * refused/unreachable connection, and a timeout are all just different
+ * `error_message`/`timed_out` combinations on a normal CheckResult, not an
+ * exception (#55's "not a hung function invocation" acceptance criterion).
+ *
+ * `Deno.connect` (unlike `fetch`) takes no `AbortSignal`/cancellation
+ * token, so the timeout here is enforced with `Promise.race` against a
+ * plain timer instead of an AbortController. If the connection succeeds
+ * only *after* the race has already resolved via that timer, `settled`
+ * (closed over by the trailing `.then` below) makes sure the now-useless
+ * straggler socket still gets closed rather than leaking until the Edge
+ * Function's own isolate is recycled.
+ */
+async function runTcpCheck(project: DueProject): Promise<CheckResult> {
+  const startedAt = performance.now();
+  const target = parseTcpTarget(project.health_url);
+
+  if (!target) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: Math.round(performance.now() - startedAt),
+      response_snippet: null,
+      error_message: `Invalid TCP target "${project.health_url}" -- expected "host:port".`,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+
+  let settled = false;
+  const connectPromise = Deno.connect({
+    hostname: target.hostname,
+    port: target.port,
+    transport: "tcp",
+  });
+  connectPromise
+    .then((conn) => {
+      if (settled) conn.close();
+    })
+    .catch(() => {
+      // Deliberately swallowed -- whichever branch below actually settles
+      // the race already reports the failure that matters (a timeout), and
+      // this handler exists solely to stop a late rejection here from
+      // surfacing as an unhandled-rejection warning for a promise nothing
+      // else is still awaiting.
+    });
+
+  const timeoutPromise = new Promise<"timeout">((resolve) => {
+    setTimeout(() => resolve("timeout"), project.timeout_ms);
+  });
+
+  try {
+    const outcome = await Promise.race([connectPromise, timeoutPromise]);
+    settled = true;
+    const responseTimeMs = Math.round(performance.now() - startedAt);
+
+    if (outcome === "timeout") {
+      return {
+        project_id: project.id,
+        http_status: null,
+        response_time_ms: responseTimeMs,
+        response_snippet: null,
+        error_message: `Timed out after ${project.timeout_ms}ms`,
+        timed_out: true,
+        attempts: 1,
+      };
+    }
+
+    outcome.close();
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: null,
+      timed_out: false,
+      attempts: 1,
+    };
+  } catch (err) {
+    settled = true;
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: Math.round(performance.now() - startedAt),
+      response_snippet: null,
+      error_message: err instanceof Error ? err.message : "Unknown error",
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+}
+
+/** Dispatches to the runner matching `project.check_type` -- the one thing
+ * every other module in this pipeline (retry.ts/classify.ts/persist.ts)
+ * calls or reasons about, so neither of them needs its own check_type
+ * branch just to fire the request. */
+export function runHealthCheck(project: DueProject): Promise<CheckResult> {
+  return project.check_type === "tcp" ? runTcpCheck(project) : runHttpCheck(project);
 }
 
 /**

@@ -3,8 +3,21 @@
 import { createClient } from "@/lib/supabase/server";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 import type { ProjectActionResult } from "../types";
-import { healthUrlSchema } from "./validation";
+import { healthUrlSchema, tcpTargetSchema } from "./validation";
 import { type HeaderMap, maskProjectHeaders, mergeHeaders } from "./headers";
+
+/**
+ * Re-validates `health_url` server-side against whichever format its
+ * `check_type` actually requires (#55) -- `healthUrlSchema`'s https:// rule
+ * for `"http"` (the default, and the only option that existed before this
+ * issue), `tcpTargetSchema`'s "host:port" rule for `"tcp"`. Shared by both
+ * createProject and updateProject below so the two can't drift.
+ */
+function validateHealthUrl(checkType: string | undefined, healthUrl: string) {
+  return checkType === "tcp"
+    ? tcpTargetSchema.safeParse(healthUrl)
+    : healthUrlSchema.safeParse(healthUrl);
+}
 
 /**
  * Server actions for project CRUD. Each wraps a single Supabase call and
@@ -44,15 +57,18 @@ export async function createProject(
     return { data: null, error: "Project name is required." };
   }
 
-  // Re-validates the same https/localhost rule the "Add project" form
-  // applies client-side (src/features/projects/lib/validation.ts), so a
-  // caller that bypasses the form (or a future bulk-import/API route) can't
-  // slip an insecure health_url past it.
-  const healthUrlResult = healthUrlSchema.safeParse(input.health_url);
+  // Re-validates the same rule the "Add project" form applies client-side
+  // (src/features/projects/lib/validation.ts), so a caller that bypasses
+  // the form (or a future bulk-import/API route) can't slip an insecure
+  // health_url -- or, for check_type = "tcp", a malformed target -- past
+  // it. `input.check_type` absent means the DB's own `'http'` default
+  // applies (see the add_tcp_check_type migration), matching
+  // validateHealthUrl's own fallback.
+  const healthUrlResult = validateHealthUrl(input.check_type, input.health_url);
   if (!healthUrlResult.success) {
     return {
       data: null,
-      error: healthUrlResult.error.issues[0]?.message ?? "Invalid health check URL.",
+      error: healthUrlResult.error.issues[0]?.message ?? "Invalid check target.",
     };
   }
 
@@ -96,18 +112,44 @@ export async function updateProject(
     return { data: null, error: "Project name cannot be empty." };
   }
 
+  const supabase = await createClient();
+
   if (input.health_url !== undefined) {
-    const healthUrlResult = healthUrlSchema.safeParse(input.health_url);
+    let checkType = input.check_type;
+    if (checkType === undefined) {
+      // This update doesn't touch check_type -- re-validate health_url
+      // against whichever check type the project *already* has, not the
+      // "http" default, so a tcp-type project's "host:port" target isn't
+      // rejected by the https:// rule just because a caller updated
+      // health_url without resending check_type in the same call (#55).
+      // The one real caller (add-project-form.tsx) always sends both
+      // together, so this lookup only ever runs for a hypothetical
+      // narrower caller -- worth the extra round trip to validate
+      // correctly rather than guess.
+      const { data: existing, error: fetchError } = await supabase
+        .from("projects")
+        .select("check_type")
+        .eq("id", id)
+        .single();
+      if (fetchError) {
+        if (fetchError.code === "PGRST116") {
+          return { data: null, error: "Project not found." };
+        }
+        return { data: null, error: fetchError.message };
+      }
+      checkType = existing.check_type;
+    }
+
+    const healthUrlResult = validateHealthUrl(checkType, input.health_url);
     if (!healthUrlResult.success) {
       return {
         data: null,
-        error: healthUrlResult.error.issues[0]?.message ?? "Invalid health check URL.",
+        error: healthUrlResult.error.issues[0]?.message ?? "Invalid check target.",
       };
     }
     input = { ...input, health_url: healthUrlResult.data };
   }
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
     .update(input)

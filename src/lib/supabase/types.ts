@@ -301,6 +301,7 @@ export type Database = {
         Row: {
           body: string | null
           check_interval_seconds: number
+          check_type: string
           collection: string | null
           created_at: string
           description: string | null
@@ -311,6 +312,7 @@ export type Database = {
           hosting_provider: string | null
           id: string
           is_active: boolean
+          is_public: boolean
           keep_alive_enabled: boolean
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
@@ -328,6 +330,7 @@ export type Database = {
         Insert: {
           body?: string | null
           check_interval_seconds?: number
+          check_type?: string
           collection?: string | null
           created_at?: string
           description?: string | null
@@ -338,6 +341,7 @@ export type Database = {
           hosting_provider?: string | null
           id?: string
           is_active?: boolean
+          is_public?: boolean
           keep_alive_enabled?: boolean
           keep_alive_timezone?: string | null
           keep_alive_window_end?: string | null
@@ -355,6 +359,7 @@ export type Database = {
         Update: {
           body?: string | null
           check_interval_seconds?: number
+          check_type?: string
           collection?: string | null
           created_at?: string
           description?: string | null
@@ -365,6 +370,7 @@ export type Database = {
           hosting_provider?: string | null
           id?: string
           is_active?: boolean
+          is_public?: boolean
           keep_alive_enabled?: boolean
           keep_alive_timezone?: string | null
           keep_alive_window_end?: string | null
@@ -398,6 +404,7 @@ export type Database = {
         Returns: {
           body: string | null
           check_interval_seconds: number
+          check_type: string
           collection: string | null
           created_at: string
           description: string | null
@@ -408,6 +415,7 @@ export type Database = {
           hosting_provider: string | null
           id: string
           is_active: boolean
+          is_public: boolean
           keep_alive_enabled: boolean
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
@@ -434,6 +442,7 @@ export type Database = {
         Returns: {
           body: string | null
           check_interval_seconds: number
+          check_type: string
           collection: string | null
           created_at: string
           description: string | null
@@ -444,6 +453,7 @@ export type Database = {
           hosting_provider: string | null
           id: string
           is_active: boolean
+          is_public: boolean
           keep_alive_enabled: boolean
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
@@ -482,6 +492,40 @@ export type Database = {
           last_checked_at: string
           last_status: string
           project_id: string
+          uptime_24h: number
+          uptime_30d: number
+          uptime_7d: number
+          uptime_90d: number
+        }[]
+      }
+      get_public_project_daily_history: {
+        Args: { p_days?: number; p_project_id: string }
+        Returns: {
+          avg_response_time_ms: number
+          day: string
+          source: string
+          total_checks: number
+          total_failures: number
+          uptime_percentage: number
+        }[]
+      }
+      get_public_project_recent_checks: {
+        Args: { p_hours?: number; p_project_id: string }
+        Returns: {
+          checked_at: string
+          http_status: number
+          response_time_ms: number
+          status: string
+        }[]
+      }
+      get_public_project_status: {
+        Args: { p_project_id: string }
+        Returns: {
+          description: string
+          id: string
+          last_checked_at: string
+          last_status: string
+          name: string
           uptime_24h: number
           uptime_30d: number
           uptime_7d: number

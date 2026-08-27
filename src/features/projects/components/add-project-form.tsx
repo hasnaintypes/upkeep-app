@@ -85,6 +85,7 @@ function toFormState(project?: Project): FormState {
     timeout_ms: project.timeout_ms,
     hosting_provider: project.hosting_provider ?? "",
     collection: project.collection ?? "",
+    check_type: (project.check_type as FormState["check_type"]) ?? "http",
     tagsInput: (project.tags ?? []).join(", "),
     keep_alive_enabled: project.keep_alive_enabled,
     keep_alive_window_start: toTimeInputValue(project.keep_alive_window_start),
@@ -160,13 +161,18 @@ export function AddProjectForm({
     // Headers are only validated/submitted here for create. For edit, they
     // go through updateProjectHeaders below instead of this schema/action --
     // see lib/headers.ts for why masked values can't just round-trip here.
-    const headersForCreate = isEditing
-      ? {}
-      : Object.fromEntries(
-          headerRows
-            .filter((row) => row.key.trim() && row.value.trim())
-            .map((row) => [row.key.trim(), row.value]),
-        );
+    // Also forced empty for check_type = "tcp" regardless of headerRows'
+    // contents -- a raw TCP check has no HTTP headers to send, and the
+    // editor for them is hidden for tcp (above), but headerRows itself
+    // isn't cleared on a check_type switch, so this is the actual guard.
+    const headersForCreate =
+      isEditing || values.check_type === "tcp"
+        ? {}
+        : Object.fromEntries(
+            headerRows
+              .filter((row) => row.key.trim() && row.value.trim())
+              .map((row) => [row.key.trim(), row.value]),
+          );
 
     const result = createProjectSchema.safeParse({
       ...values,
@@ -187,6 +193,7 @@ export function AddProjectForm({
           name,
           description,
           health_url,
+          check_type,
           method,
           body,
           expected_status,
@@ -205,6 +212,7 @@ export function AddProjectForm({
           name,
           description,
           health_url,
+          check_type,
           method,
           body,
           expected_status,
@@ -304,25 +312,63 @@ export function AddProjectForm({
           <FieldError errors={toFieldErrorMessages(fieldErrors.description)} />
         </Field>
 
-        <Field data-invalid={!!fieldErrors.health_url}>
-          <FieldLabel htmlFor="health_url">Health check URL</FieldLabel>
-          <Input
-            id="health_url"
-            type="url"
-            placeholder="https://your-app.example.com/health"
-            required
-            aria-invalid={!!fieldErrors.health_url}
-            value={values.health_url}
-            onChange={(e) => updateField("health_url", e.target.value)}
-          />
-          <FieldDescription>
-            Must use https://
-            {process.env.NODE_ENV !== "production" &&
-              ", or http://localhost while developing"}
-            .
-          </FieldDescription>
-          <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+        <Field orientation="responsive">
+          <FieldLabel htmlFor="check_type">Check type</FieldLabel>
+          <Select
+            value={values.check_type}
+            onValueChange={(value) =>
+              updateField("check_type", value as FormState["check_type"])
+            }
+          >
+            <SelectTrigger id="check_type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="http">HTTP</SelectItem>
+              <SelectItem value="tcp">TCP port</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
+
+        {values.check_type === "tcp" ? (
+          <Field data-invalid={!!fieldErrors.health_url}>
+            <FieldLabel htmlFor="health_url">Health check target</FieldLabel>
+            <Input
+              id="health_url"
+              type="text"
+              placeholder="db.example.com:5432"
+              required
+              aria-invalid={!!fieldErrors.health_url}
+              value={values.health_url}
+              onChange={(e) => updateField("health_url", e.target.value)}
+            />
+            <FieldDescription>
+              Enter as &quot;host:port&quot;. Only whether a TCP connection
+              can be opened is checked -- no request is sent.
+            </FieldDescription>
+            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+          </Field>
+        ) : (
+          <Field data-invalid={!!fieldErrors.health_url}>
+            <FieldLabel htmlFor="health_url">Health check URL</FieldLabel>
+            <Input
+              id="health_url"
+              type="url"
+              placeholder="https://your-app.example.com/health"
+              required
+              aria-invalid={!!fieldErrors.health_url}
+              value={values.health_url}
+              onChange={(e) => updateField("health_url", e.target.value)}
+            />
+            <FieldDescription>
+              Must use https://
+              {process.env.NODE_ENV !== "production" &&
+                ", or http://localhost while developing"}
+              .
+            </FieldDescription>
+            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+          </Field>
+        )}
 
         <Accordion type="single" collapsible>
           <AccordionItem value="advanced">
@@ -331,26 +377,28 @@ export function AddProjectForm({
             </AccordionTrigger>
             <AccordionContent>
               <FieldGroup>
-                <Field orientation="responsive">
-                  <FieldLabel htmlFor="method">Method</FieldLabel>
-                  <Select
-                    value={values.method}
-                    onValueChange={(value) =>
-                      updateField("method", value as FormState["method"])
-                    }
-                  >
-                    <SelectTrigger id="method" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GET">GET</SelectItem>
-                      <SelectItem value="POST">POST</SelectItem>
-                      <SelectItem value="HEAD">HEAD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
+                {values.check_type !== "tcp" && (
+                  <Field orientation="responsive">
+                    <FieldLabel htmlFor="method">Method</FieldLabel>
+                    <Select
+                      value={values.method}
+                      onValueChange={(value) =>
+                        updateField("method", value as FormState["method"])
+                      }
+                    >
+                      <SelectTrigger id="method" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GET">GET</SelectItem>
+                        <SelectItem value="POST">POST</SelectItem>
+                        <SelectItem value="HEAD">HEAD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
 
-                {values.method !== "GET" && (
+                {values.check_type !== "tcp" && values.method !== "GET" && (
                   <Field data-invalid={!!fieldErrors.body}>
                     <FieldLabel htmlFor="body">Request body</FieldLabel>
                     <Textarea
@@ -369,26 +417,28 @@ export function AddProjectForm({
                   </Field>
                 )}
 
-                <Field
-                  orientation="responsive"
-                  data-invalid={!!fieldErrors.expected_status}
-                >
-                  <FieldLabel htmlFor="expected_status">
-                    Expected status
-                  </FieldLabel>
-                  <Input
-                    id="expected_status"
-                    type="number"
-                    aria-invalid={!!fieldErrors.expected_status}
-                    value={values.expected_status}
-                    onChange={(e) =>
-                      updateField("expected_status", Number(e.target.value))
-                    }
-                  />
-                  <FieldError
-                    errors={toFieldErrorMessages(fieldErrors.expected_status)}
-                  />
-                </Field>
+                {values.check_type !== "tcp" && (
+                  <Field
+                    orientation="responsive"
+                    data-invalid={!!fieldErrors.expected_status}
+                  >
+                    <FieldLabel htmlFor="expected_status">
+                      Expected status
+                    </FieldLabel>
+                    <Input
+                      id="expected_status"
+                      type="number"
+                      aria-invalid={!!fieldErrors.expected_status}
+                      value={values.expected_status}
+                      onChange={(e) =>
+                        updateField("expected_status", Number(e.target.value))
+                      }
+                    />
+                    <FieldError
+                      errors={toFieldErrorMessages(fieldErrors.expected_status)}
+                    />
+                  </Field>
+                )}
 
                 <Field
                   orientation="responsive"
@@ -487,7 +537,9 @@ export function AddProjectForm({
                   <FieldError errors={toFieldErrorMessages(fieldErrors.tags)} />
                 </Field>
 
-                <HeaderFieldsEditor rows={headerRows} onChange={setHeaderRows} />
+                {values.check_type !== "tcp" && (
+                  <HeaderFieldsEditor rows={headerRows} onChange={setHeaderRows} />
+                )}
 
                 <Field orientation="horizontal" className="w-auto gap-2">
                   <FieldLabel htmlFor="keep_alive_enabled">

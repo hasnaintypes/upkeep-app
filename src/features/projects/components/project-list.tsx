@@ -33,6 +33,7 @@ import {
 import { notify } from "@/lib/toast";
 import { AddProjectSheet } from "./add-project-sheet";
 import { deleteProject, setProjectActive } from "../lib/actions";
+import { checkTargetPrefix } from "../lib/format";
 import { runProjectCheckNow } from "../lib/run-check";
 import type { ManualCheckResult, Project } from "../types";
 
@@ -264,7 +265,7 @@ export function ProjectList({
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
                   <p className="truncate text-sm text-muted-foreground">
-                    {project.method} {project.health_url}
+                    {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
                   </p>
                   {(project.hosting_provider || project.tags?.length) && (
                     <div className="flex flex-wrap gap-1">

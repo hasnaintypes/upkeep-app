@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IANA_TIMEZONES, PROJECT_DEFAULTS } from "../constants";
+import { CHECK_TYPES, IANA_TIMEZONES, PROJECT_DEFAULTS } from "../constants";
 
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -39,6 +39,40 @@ export const healthUrlSchema = z
         message: isDev
           ? "URL must start with https://, or http://localhost while developing."
           : "URL must start with https://.",
+      });
+    }
+  });
+
+/**
+ * `check_type === "tcp"`'s target validation: "host:port", not a URL (PRD
+ * §5.2, Phase 9, #55). Exported (like healthUrlSchema) so createProject/
+ * updateProject can re-validate server-side too. Mirrors (does not import
+ * -- can't; separate Deno runtime/module graph) `parseTcpTarget` in
+ * supabase/functions/prober/check.ts -- keep the two in sync if this format
+ * ever changes. Syntax-only, same as healthUrlSchema: whether the host
+ * actually resolves/accepts connections is exactly what the prober's own
+ * check determines at check time, not at save time.
+ */
+export const tcpTargetSchema = z
+  .string()
+  .trim()
+  .min(1, "A target is required.")
+  .superRefine((value, ctx) => {
+    const separatorIndex = value.lastIndexOf(":");
+    const host = separatorIndex > 0 ? value.slice(0, separatorIndex) : "";
+    const port = Number(value.slice(separatorIndex + 1));
+
+    if (
+      separatorIndex <= 0 ||
+      separatorIndex === value.length - 1 ||
+      !host ||
+      !Number.isInteger(port) ||
+      port < 1 ||
+      port > 65535
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: 'Enter a target as "host:port" (e.g. db.example.com:5432).',
       });
     }
   });
@@ -89,7 +123,12 @@ export const createProjectSchema = z.object({
     .trim()
     .max(2000, "Description must be 2000 characters or fewer.")
     .optional(),
-  health_url: healthUrlSchema,
+  // Format depends on check_type -- validated in the object-level
+  // superRefine below (either healthUrlSchema's https:// rule or
+  // tcpTargetSchema's "host:port" rule), not here, so a valid tcp target
+  // isn't rejected by an unconditionally-applied URL check.
+  health_url: z.string().trim().min(1, "A target is required."),
+  check_type: z.enum(CHECK_TYPES).optional(),
   method: z.enum(["GET", "POST", "HEAD"]),
   // Only meaningful for non-GET methods -- fetch() clients (including the
   // prober's) reject a body on GET requests, so the prober only sends this
@@ -146,6 +185,15 @@ export const createProjectSchema = z.object({
   keep_alive_window_end: optionalTimeOfDay,
   keep_alive_timezone: optionalTimezone,
 }).superRefine((values, ctx) => {
+  const checkType = values.check_type ?? "http";
+  const targetValidator = checkType === "tcp" ? tcpTargetSchema : healthUrlSchema;
+  const targetResult = targetValidator.safeParse(values.health_url);
+  if (!targetResult.success) {
+    for (const issue of targetResult.error.issues) {
+      ctx.addIssue({ ...issue, path: ["health_url"] });
+    }
+  }
+
   const { keep_alive_window_start, keep_alive_window_end, keep_alive_timezone } = values;
   const setCount = [keep_alive_window_start, keep_alive_window_end, keep_alive_timezone].filter(
     (value) => value !== null,
@@ -195,6 +243,7 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   name: "",
   description: "",
   health_url: "",
+  check_type: PROJECT_DEFAULTS.checkType,
   method: PROJECT_DEFAULTS.method,
   body: "",
   expected_status: PROJECT_DEFAULTS.expectedStatus,

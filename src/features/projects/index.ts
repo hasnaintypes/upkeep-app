@@ -8,6 +8,7 @@ export { ProjectList } from "./components/project-list";
 
 export * from "./constants";
 export * from "./lib/actions";
+export * from "./lib/format";
 export * from "./lib/queries";
 export * from "./lib/run-check";
 export * from "./types";

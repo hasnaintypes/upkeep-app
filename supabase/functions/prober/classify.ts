@@ -1,5 +1,6 @@
-// Status classification (PRD §5.2, Phase 3, issue #24): maps a check's raw
-// outcome to one of up/down/degraded/waking/unknown.
+// Status classification (PRD §5.2, Phase 3, issue #24; TCP check type,
+// Phase 9, issue #55): maps a check's raw outcome to one of
+// up/down/degraded/waking/unknown.
 //
 // Thresholds are the Phase 3 readiness-checklist decision recorded in
 // docs/ROADMAP.md -- not invented ad hoc here. If they ever need to change,
@@ -9,8 +10,20 @@
 // against the response body) -- that's PRD §5.2's "additional check types"
 // list, tracked as its own Phase 9 roadmap task, not part of this basic
 // five-way classification.
+//
+// #55's `check_type === "tcp"` branch is handled first and separately
+// (see below) rather than folded into the HTTP-oriented rules underneath:
+// a bare TCP check has no response body/status/timing-quality signal to
+// grade the way an HTTP response does, so it only ever produces "up" or
+// "down" -- never "degraded"/"waking" (no successful-but-slow concept
+// without a body to have been slow to deliver) and never "unknown" either
+// (unlike HTTP, there's no separate "reached the host but got a
+// surprising app-level response" case for a bare TCP check to distinguish
+// from "couldn't reach it at all" -- for TCP, failing to connect *is* the
+// down signal, full stop; see this issue's own acceptance criterion:
+// "An unreachable host:port produces a down check").
 
-import type { CheckResult } from "./check.ts";
+import type { CheckResult, CheckType } from "./check.ts";
 
 export type CheckStatus = "up" | "down" | "degraded" | "waking" | "unknown";
 
@@ -25,6 +38,7 @@ export const DEGRADED_THRESHOLD_MS = 3000;
 /** The subset of a project's config the classifier needs. */
 export type ClassifiableProject = {
   expected_status: number;
+  check_type: CheckType;
 };
 
 /**
@@ -37,6 +51,10 @@ export function classifyCheck(
   result: CheckResult,
   project: ClassifiableProject,
 ): CheckStatus {
+  if (project.check_type === "tcp") {
+    return result.error_message === null ? "up" : "down";
+  }
+
   // Never got as far as an HTTP response, and it wasn't our own timeout
   // abort -- DNS failure, connection refused, TLS error, etc. The check
   // itself couldn't execute, which is a different (and generally more

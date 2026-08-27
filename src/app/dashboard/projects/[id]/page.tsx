@@ -5,7 +5,7 @@ import { ArrowLeftIcon } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getProjectById } from "@/features/projects";
+import { checkTargetPrefix, getProjectById } from "@/features/projects";
 import {
   CheckLogTable,
   getProjectChecksPage,
@@ -118,7 +118,7 @@ async function ProjectDetailLoader({
           <p className="text-sm text-muted-foreground">{project.description}</p>
         )}
         <p className="text-sm text-muted-foreground">
-          {project.method} {project.health_url}
+          {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
         </p>
       </div>
 

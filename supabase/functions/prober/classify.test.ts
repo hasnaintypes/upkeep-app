@@ -6,7 +6,8 @@ import { assertEquals } from "@std/assert";
 import { classifyCheck, type ClassifiableProject } from "./classify.ts";
 import type { CheckResult } from "./check.ts";
 
-const project: ClassifiableProject = { expected_status: 200 };
+const project: ClassifiableProject = { expected_status: 200, check_type: "http" };
+const tcpProject: ClassifiableProject = { expected_status: 200, check_type: "tcp" };
 
 function result(overrides: Partial<CheckResult>): CheckResult {
   return {
@@ -102,4 +103,47 @@ Deno.test("classifyCheck: a slow response that still matches expected_status is 
     project,
   );
   assertEquals(status, "waking");
+});
+
+// #55: check_type = "tcp" -- only ever up/down, regardless of http_status
+// (always null for a TCP result) or response_time_ms (no degraded/waking
+// concept without a response body to have been slow to deliver).
+Deno.test("classifyCheck: tcp, reachable within timeout -> up, even if slow", () => {
+  assertEquals(
+    classifyCheck(
+      result({ http_status: null, response_time_ms: 9000 }),
+      tcpProject,
+    ),
+    "up",
+  );
+});
+
+Deno.test("classifyCheck: tcp, connection refused -> down, not unknown", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        timed_out: false,
+        error_message: "Connection refused",
+        response_time_ms: 12,
+      }),
+      tcpProject,
+    ),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: tcp, timed out -> down", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        timed_out: true,
+        error_message: "Timed out after 5000ms",
+        response_time_ms: 5000,
+      }),
+      tcpProject,
+    ),
+    "down",
+  );
 });
