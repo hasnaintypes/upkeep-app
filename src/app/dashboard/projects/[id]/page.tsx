@@ -120,6 +120,17 @@ async function ProjectDetailLoader({
         <p className="text-sm text-muted-foreground">
           {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
         </p>
+        {project.rate_limit_backoff_until &&
+          new Date(project.rate_limit_backoff_until) > new Date() && (
+            <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
+              Checks paused until{" "}
+              {new Date(project.rate_limit_backoff_until).toLocaleTimeString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+              })}{" "}
+              — this host has been rate-limiting Upkeep&apos;s requests.
+            </p>
+          )}
       </div>
 
       <ResponseTimeSection seriesByWindow={seriesByWindow} />

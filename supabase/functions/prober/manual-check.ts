@@ -29,6 +29,7 @@ import { classifyCheck } from "./classify.ts";
 import { readEnv } from "./env.ts";
 import { writeCheckResult, type InsertableClient } from "./persist.ts";
 import { maybeOpenIncident, maybeResolveIncident, type IncidentClient } from "./incidents.ts";
+import { applyRateLimitBackoff, isRateLimited, type BackoffClient } from "./rate-limit.ts";
 
 /** The minimal shape this module needs to look up one project by id --
  * mirrors persist.ts's InsertableClient in spirit: narrow and structural,
@@ -58,7 +59,7 @@ export type ProjectLookupClient = {
  * is a batch-scheduling concern, not a manual-trigger one.
  */
 export async function runManualCheck(
-  supabaseAdmin: ProjectLookupClient & InsertableClient & IncidentClient,
+  supabaseAdmin: ProjectLookupClient & InsertableClient & IncidentClient & BackoffClient,
   projectId: string,
 ): Promise<Response> {
   const { data: project, error } = await supabaseAdmin
@@ -76,6 +77,7 @@ export async function runManualCheck(
 
   const result = await runHealthCheckWithRetry(project);
   const status = classifyCheck(result, project);
+  const rateLimited = isRateLimited(result);
   // `region` is informational only here (#60) -- a manual check is always
   // a single-vantage-point probe, whatever region it happens to execute
   // in (Supabase's Edge Runtime routes it wherever's nearest, same as any
@@ -83,10 +85,21 @@ export async function runManualCheck(
   // `isConsensus` stays at persist.ts's own default (`true`): a manual
   // check must keep counting toward incidents.ts's escalation/resolution
   // streak exactly as it always has, unaffected by the batch tick's own
-  // multi-region fan-out.
-  const persisted = await writeCheckResult(supabaseAdmin, result, status, {
-    region: readEnv("SB_REGION") ?? null,
-  });
+  // multi-region fan-out. `isRateLimited` (#61) marks this row the same
+  // way the batch path does, so a manually-triggered 429 is excluded from
+  // that same streak too.
+  const [persisted] = await Promise.all([
+    writeCheckResult(supabaseAdmin, result, status, {
+      region: readEnv("SB_REGION") ?? null,
+      isRateLimited: rateLimited,
+    }),
+    // Manual checks bypass get_due_projects() entirely (see this module's
+    // own top comment), so they already bypass the *scheduling* side of
+    // backoff for free -- this still keeps rate_limit_backoff_until/count
+    // accurate so the batch path's own next tick reflects whatever this
+    // manual check just observed.
+    applyRateLimitBackoff(supabaseAdmin, project.id, project, rateLimited),
+  ]);
 
   // Same incident detection/resolution (#35/#36) as the batch path -- a
   // manual "run check now" can just as validly be the check that crosses

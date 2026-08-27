@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -75,7 +76,14 @@ export function CheckLogTable({
                   <Fragment key={row.id}>
                     <TableRow>
                       <TableCell>
-                        <StatusBadge status={row.status} />
+                        <div className="flex items-center gap-1.5">
+                          <StatusBadge status={row.status} />
+                          {row.is_rate_limited && (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Rate limited
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden text-muted-foreground sm:table-cell">
                         {row.http_status ?? "—"}

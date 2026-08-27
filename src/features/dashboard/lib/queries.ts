@@ -156,7 +156,7 @@ export async function getProjectDailyHistory(projectId: string): Promise<{
 }
 
 const CHECK_LOG_COLUMNS =
-  "id, status, http_status, response_time_ms, error_message, response_snippet, checked_at";
+  "id, status, http_status, response_time_ms, error_message, response_snippet, checked_at, is_rate_limited";
 
 /**
  * One page of a project's raw check log, newest-first (PRD §5.6, Phase 4,

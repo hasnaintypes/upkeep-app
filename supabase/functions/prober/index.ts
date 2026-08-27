@@ -122,6 +122,7 @@ import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { InsertableClient } from "./persist.ts";
 import { maybeOpenIncidents, maybeResolveIncidents, type IncidentClient } from "./incidents.ts";
 import { runKeepAlivePings, type KeepAliveClient } from "./keep-alive.ts";
+import { applyRateLimitBackoff, isRateLimited, type BackoffClient } from "./rate-limit.ts";
 import {
   deriveConsensusStatus,
   fanOutToRegions,
@@ -195,7 +196,10 @@ const prober = {
       // otherwise blows the type-checker's instantiation depth limit
       // (TS2589) without changing anything at runtime.
       return runManualCheck(
-        ctx.supabaseAdmin as unknown as ProjectLookupClient & InsertableClient & IncidentClient,
+        ctx.supabaseAdmin as unknown as ProjectLookupClient &
+          InsertableClient &
+          IncidentClient &
+          BackoffClient,
         manualProjectId,
       );
     }
@@ -316,11 +320,29 @@ const prober = {
       const consensusEntries = perProject.map(({ consensus }) => ({
         result: consensus.representative.result,
         status: consensus.status,
+        options: {
+          isRateLimited: isRateLimited(consensus.representative.result),
+        } satisfies WriteCheckResultOptions,
       }));
+
+      // #61: grows/clears each project's own rate-limit backoff window
+      // based on this round's consensus result, concurrently with (not
+      // blocking on) the checks-row writes below -- an independent piece
+      // of per-project state, same reasoning as running regional/consensus
+      // writes concurrently with each other.
+      const backoffUpdates = perProject.map(({ project, consensus }) =>
+        applyRateLimitBackoff(
+          ctx.supabaseAdmin as unknown as BackoffClient,
+          project.id,
+          project,
+          isRateLimited(consensus.representative.result),
+        ),
+      );
 
       const [regionalPersisted, consensusPersisted] = await Promise.all([
         writeCheckResults(ctx.supabaseAdmin, regionalEntries),
         writeCheckResults(ctx.supabaseAdmin, consensusEntries),
+        Promise.all(backoffUpdates),
       ]);
       void regionalPersisted; // Diagnostic rows only -- nothing downstream keys off their write outcome.
       const consensusPersistedById = new Map(

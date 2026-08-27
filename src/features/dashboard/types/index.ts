@@ -107,6 +107,10 @@ export type CheckLogRow = {
   error_message: string | null;
   response_snippet: string | null;
   checked_at: string;
+  /** True only when this check received HTTP 429 (PRD §5.2, Phase 9, #61)
+   * -- the prober backs the project off rather than treating this as a
+   * real outage; the check log distinguishes it from a plain "Down" row. */
+  is_rate_limited: boolean;
 };
 
 /**

@@ -46,6 +46,12 @@ export type DueProject = {
   retry_count: number;
   expected_status: number;
   check_type: CheckType;
+  /** Rate-limit backoff (PRD §5.2, Phase 9, issue #61) -- `check_interval_seconds`
+   * (already present on every `projects` row, just not previously needed by
+   * this module) and `rate_limit_backoff_count` are what `rate-limit.ts`'s
+   * `computeBackoffSeconds` needs to grow a project's next backoff window. */
+  check_interval_seconds: number;
+  rate_limit_backoff_count: number;
   /** Keyword/content match check (PRD §5.2, Phase 9, issue #58) --
    * `null`/empty means "not configured", preserving every existing
    * project's current behavior unchanged (#58's own acceptance

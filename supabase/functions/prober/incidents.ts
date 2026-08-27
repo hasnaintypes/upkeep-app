@@ -122,6 +122,23 @@ export function deriveIncidentCause(check: RecentCheck): string {
     : "Check failed";
 }
 
+/** A chainable `.eq(...)` filter step on the `checks` query below, recursive
+ * so it can be called one or more times before finally `.order(...)`ing --
+ * see IncidentClient's own comment on why this needs to support both a
+ * 2-eq and a 3-eq call site against the same structural type. */
+type EqChain = {
+  eq(column: string, value: boolean): EqChain;
+  order(
+    column: string,
+    opts: { ascending: boolean },
+  ): {
+    limit(n: number): PromiseLike<{
+      data: RecentCheck[] | null;
+      error: { message: string } | null;
+    }>;
+  };
+};
+
 /** The minimal shape this module needs from a Supabase client -- narrow and
  * structural, same reasoning as persist.ts's InsertableClient / manual-
  * check.ts's ProjectLookupClient: testable against a fake without the real
@@ -134,22 +151,14 @@ export type IncidentClient = {
         column: string,
         value: string,
       ): {
-        // Chained a second time for `.eq("is_consensus", true)` (#60) --
-        // see this module's own top comment.
-        eq(
-          column: string,
-          value: boolean,
-        ): {
-          order(
-            column: string,
-            opts: { ascending: boolean },
-          ): {
-            limit(n: number): PromiseLike<{
-              data: RecentCheck[] | null;
-              error: { message: string } | null;
-            }>;
-          };
-        };
+        // Chained for `.eq("is_consensus", true)` (#60) and, on top of
+        // that, `.eq("is_rate_limited", false)` (#61) -- see this module's
+        // own top comment. `EqChain` is recursive (`.eq()` returns another
+        // `EqChain`) so both maybeOpenIncident's 3-eq query and
+        // maybeResolveIncident's 2-eq query satisfy the same structural
+        // type without one forcing the other to add a filter it doesn't
+        // use.
+        eq(column: string, value: boolean): EqChain;
       };
     };
   };
@@ -215,6 +224,10 @@ export async function maybeOpenIncident(
     .select("status, checked_at, http_status, error_message, response_time_ms")
     .eq("project_id", projectId)
     .eq("is_consensus", true)
+    // #61: a 429 response is Upkeep's own rate-limit backoff triggering,
+    // not a real failure -- excluded here so it can never be one of the
+    // "threshold consecutive down checks" that opens a false incident.
+    .eq("is_rate_limited", false)
     .order("checked_at", { ascending: false })
     .limit(threshold);
 

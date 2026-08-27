@@ -6,8 +6,9 @@ import { runManualCheck, type ProjectLookupClient } from "./manual-check.ts";
 import type { DueProject } from "./check.ts";
 import type { InsertableClient } from "./persist.ts";
 import type { IncidentClient } from "./incidents.ts";
+import type { BackoffClient } from "./rate-limit.ts";
 
-type FakeClient = ProjectLookupClient & InsertableClient & IncidentClient;
+type FakeClient = ProjectLookupClient & InsertableClient & IncidentClient & BackoffClient;
 
 function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
   return {
@@ -20,6 +21,8 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     retry_count: 0,
     expected_status: 200,
     check_type: "http",
+    check_interval_seconds: 300,
+    rate_limit_backoff_count: 0,
     expected_body_match: null,
     expected_json_path: null,
     expected_json_value: null,
@@ -39,8 +42,10 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
 function fakeClient(project: DueProject | null): {
   client: FakeClient;
   inserted: Record<string, unknown>[];
+  updated: Record<string, unknown>[];
 } {
   const inserted: Record<string, unknown>[] = [];
+  const updated: Record<string, unknown>[] = [];
   const client = {
     from: (table: string) => {
       if (table === "projects") {
@@ -50,19 +55,28 @@ function fakeClient(project: DueProject | null): {
               maybeSingle: () => Promise.resolve({ data: project, error: null }),
             }),
           }),
+          // #61: applyRateLimitBackoff's update, alongside the lookup select
+          // above -- both live under `from("projects")`.
+          update: (values: Record<string, unknown>) => {
+            updated.push(values);
+            return { eq: (_column: string, _value: string) => Promise.resolve({ error: null }) };
+          },
         };
       }
 
       if (table === "checks") {
+        // `.eq("is_consensus", true).eq("is_rate_limited", false)` (#61) --
+        // recursive so either chain length reaches the same canned-empty
+        // result, same reasoning as incidents.test.ts's own eqChain.
+        const eqChain: unknown = {
+          eq: (_column2: string, _value2: boolean) => eqChain,
+          order: (_column: string, _opts: { ascending: boolean }) => ({
+            limit: (_n: number) => Promise.resolve({ data: [], error: null }),
+          }),
+        };
         return {
           select: (_columns: string) => ({
-            eq: (_column: string, _value: string) => ({
-              eq: (_column2: string, _value2: boolean) => ({
-                order: (_column: string, _opts: { ascending: boolean }) => ({
-                  limit: (_n: number) => Promise.resolve({ data: [], error: null }),
-                }),
-              }),
-            }),
+            eq: (_column: string, _value: string) => eqChain,
           }),
           insert: (values: Record<string, unknown>) => {
             inserted.push(values);
@@ -94,7 +108,7 @@ function fakeClient(project: DueProject | null): {
     // instead of reaching for `any`.
   } as unknown as FakeClient;
 
-  return { client, inserted };
+  return { client, inserted, updated };
 }
 
 /** Temporarily replaces globalThis.fetch for the duration of `run`, always
@@ -272,4 +286,34 @@ Deno.test("runManualCheck: expected_json_path set but body isn't valid JSON -> d
     (inserted[0].error_message as string).startsWith("Response body is not valid JSON"),
     true,
   );
+});
+
+Deno.test("runManualCheck: a 429 marks the row is_rate_limited and sets backoff (#61)", async () => {
+  const { client, inserted, updated } = fakeClient(fakeProject({ rate_limit_backoff_count: 0 }));
+
+  const body = await withFakeFetch(
+    () => new Response("too many requests", { status: 429 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.status, "down");
+  assertEquals(body.http_status, 429);
+  assertEquals(inserted[0].is_rate_limited, true);
+  assertEquals(updated.length, 1);
+  assertEquals(updated[0].rate_limit_backoff_count, 1);
+  assertEquals(typeof updated[0].rate_limit_backoff_until, "string");
+});
+
+Deno.test("runManualCheck: a healthy response clears a project's prior backoff (#61)", async () => {
+  const { client, updated } = fakeClient(fakeProject({ rate_limit_backoff_count: 2 }));
+
+  await withFakeFetch(
+    () => new Response("ok", { status: 200 }),
+    () => runManualCheck(client, "test-project"),
+  );
+
+  assertEquals(updated, [{ rate_limit_backoff_until: null, rate_limit_backoff_count: 0 }]);
 });

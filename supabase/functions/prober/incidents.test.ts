@@ -131,16 +131,19 @@ function fakeClient(options: {
   const client = {
     from(table: string) {
       if (table === "checks") {
+        // `.eq("is_consensus", true).eq("is_rate_limited", false)` -- both
+        // canned to just return `options.recentChecks` regardless of the
+        // actual filter values passed, same "configurable canned data"
+        // philosophy every other test using this helper already relies on.
+        const eqChain = {
+          eq: (_column2: string, _value2: boolean) => eqChain,
+          order: (_column: string, _opts: { ascending: boolean }) => ({
+            limit: (_n: number) => Promise.resolve({ data: options.recentChecks, error: null }),
+          }),
+        };
         return {
           select: (_columns: string) => ({
-            eq: (_column: string, _value: string) => ({
-              eq: (_column2: string, _value2: boolean) => ({
-                order: (_column: string, _opts: { ascending: boolean }) => ({
-                  limit: (_n: number) =>
-                    Promise.resolve({ data: options.recentChecks, error: null }),
-                }),
-              }),
-            }),
+            eq: (_column: string, _value: string) => eqChain,
           }),
         };
       }
@@ -180,29 +183,29 @@ function fakeClient(options: {
   return { client, inserted, updated };
 }
 
-Deno.test("maybeOpenIncident: filters the recent-checks query to is_consensus = true (#60)", async () => {
+Deno.test("maybeOpenIncident: filters the recent-checks query to is_consensus = true and is_rate_limited = false (#60/#61)", async () => {
   const seenEqCalls: Array<[string, unknown]> = [];
   const client = {
     from(table: string) {
       if (table === "checks") {
+        const eqChain = (depth: number): unknown => ({
+          eq: (column2: string, value2: boolean) => {
+            seenEqCalls.push([column2, value2]);
+            return eqChain(depth + 1);
+          },
+          order: () => ({
+            limit: () =>
+              Promise.resolve({
+                data: [check({ status: "down" }), check({ status: "down" })],
+                error: null,
+              }),
+          }),
+        });
         return {
           select: () => ({
             eq: (column: string, value: string) => {
               seenEqCalls.push([column, value]);
-              return {
-                eq: (column2: string, value2: boolean) => {
-                  seenEqCalls.push([column2, value2]);
-                  return {
-                    order: () => ({
-                      limit: () =>
-                        Promise.resolve({
-                          data: [check({ status: "down" }), check({ status: "down" })],
-                          error: null,
-                        }),
-                    }),
-                  };
-                },
-              };
+              return eqChain(0);
             },
           }),
         };
@@ -224,6 +227,7 @@ Deno.test("maybeOpenIncident: filters the recent-checks query to is_consensus = 
   assertEquals(seenEqCalls, [
     ["project_id", "project-1"],
     ["is_consensus", true],
+    ["is_rate_limited", false],
   ]);
 });
 
@@ -282,16 +286,16 @@ Deno.test("maybeOpenIncident: surfaces (not throws) a checks-query error", async
   const client = {
     from(table: string) {
       if (table === "checks") {
+        const eqChain: unknown = {
+          eq: () => eqChain,
+          order: () => ({
+            limit: () =>
+              Promise.resolve({ data: null, error: { message: "connection reset" } }),
+          }),
+        };
         return {
           select: () => ({
-            eq: () => ({
-              eq: () => ({
-                order: () => ({
-                  limit: () =>
-                    Promise.resolve({ data: null, error: { message: "connection reset" } }),
-                }),
-              }),
-            }),
+            eq: () => eqChain,
           }),
         };
       }
@@ -302,6 +306,83 @@ Deno.test("maybeOpenIncident: surfaces (not throws) a checks-query error", async
   const result = await maybeOpenIncident(client, "project-1", "down", 2);
   assertEquals(result.opened, false);
   assertExists((result as { error?: string }).error);
+});
+
+Deno.test("maybeOpenIncident: two consecutive 429s never open a false incident (#61)", async () => {
+  // A faithful-enough fake that actually applies the is_consensus/
+  // is_rate_limited filters (unlike fakeClient's canned-array shortcut
+  // above) -- this is the one test that needs to prove the *filtering*
+  // itself works, not just that maybeOpenIncident calls .eq() with the
+  // right arguments.
+  const rows: Array<RecentCheck & { is_consensus: boolean; is_rate_limited: boolean }> = [
+    {
+      ...check({ status: "up", checked_at: "2026-08-24T00:00:00Z" }),
+      is_consensus: true,
+      is_rate_limited: false,
+    },
+    {
+      ...check({ status: "down", checked_at: "2026-08-24T00:01:00Z", http_status: 429 }),
+      is_consensus: true,
+      is_rate_limited: true,
+    },
+    {
+      ...check({ status: "down", checked_at: "2026-08-24T00:02:00Z", http_status: 429 }),
+      is_consensus: true,
+      is_rate_limited: true,
+    },
+  ];
+  const inserted: Record<string, unknown>[] = [];
+
+  const client = {
+    from(table: string) {
+      if (table === "checks") {
+        return {
+          select: () => ({
+            eq: (_c1: string, _projectId: string) => ({
+              eq: (_c2: string, consensusValue: boolean) => ({
+                eq: (_c3: string, rateLimitedValue: boolean) => ({
+                  order: () => ({
+                    limit: (n: number) =>
+                      Promise.resolve({
+                        data: rows
+                          .filter(
+                            (r) =>
+                              r.is_consensus === consensusValue &&
+                              r.is_rate_limited === rateLimitedValue,
+                          )
+                          .sort((a, b) => b.checked_at.localeCompare(a.checked_at))
+                          .slice(0, n),
+                        error: null,
+                      }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "incidents") {
+        return {
+          select: () => ({
+            eq: () => ({ is: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }),
+          }),
+          insert: (values: Record<string, unknown>) => {
+            inserted.push(values);
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    },
+  } as unknown as IncidentClient;
+
+  const result = await maybeOpenIncident(client, "project-1", "down", 2);
+
+  // With the two 429 rows excluded, only the one prior "up" check remains
+  // -- below threshold, so no incident opens purely from Upkeep's own
+  // rate-limit backoff.
+  assertEquals(result, { opened: false, reason: "below_threshold" });
+  assertEquals(inserted.length, 0);
 });
 
 // --- meetsRecoveryThreshold -------------------------------------------------

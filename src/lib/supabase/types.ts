@@ -79,6 +79,7 @@ export type Database = {
           http_status: number | null
           id: string
           is_consensus: boolean
+          is_rate_limited: boolean
           project_id: string
           region: string | null
           response_snippet: string | null
@@ -91,6 +92,7 @@ export type Database = {
           http_status?: number | null
           id?: string
           is_consensus?: boolean
+          is_rate_limited?: boolean
           project_id: string
           region?: string | null
           response_snippet?: string | null
@@ -103,6 +105,7 @@ export type Database = {
           http_status?: number | null
           id?: string
           is_consensus?: boolean
+          is_rate_limited?: boolean
           project_id?: string
           region?: string | null
           response_snippet?: string | null
@@ -326,6 +329,8 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          rate_limit_backoff_count: number
+          rate_limit_backoff_until: string | null
           retry_count: number
           tags: string[] | null
           timeout_ms: number
@@ -357,6 +362,8 @@ export type Database = {
           last_manual_check_at?: string | null
           method?: string
           name: string
+          rate_limit_backoff_count?: number
+          rate_limit_backoff_until?: string | null
           retry_count?: number
           tags?: string[] | null
           timeout_ms?: number
@@ -388,6 +395,8 @@ export type Database = {
           last_manual_check_at?: string | null
           method?: string
           name?: string
+          rate_limit_backoff_count?: number
+          rate_limit_backoff_until?: string | null
           retry_count?: number
           tags?: string[] | null
           timeout_ms?: number
@@ -435,6 +444,8 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          rate_limit_backoff_count: number
+          rate_limit_backoff_until: string | null
           retry_count: number
           tags: string[] | null
           timeout_ms: number
@@ -475,6 +486,8 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          rate_limit_backoff_count: number
+          rate_limit_backoff_until: string | null
           retry_count: number
           tags: string[] | null
           timeout_ms: number

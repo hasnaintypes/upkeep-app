@@ -66,6 +66,12 @@ export type WriteCheckResultOptions = {
    * visibility (`checks.region` populated) and must not each
    * independently count as "this project's status this round". */
   isConsensus?: boolean;
+  /** True only when this round's result was an HTTP 429 (#61, see
+   * rate-limit.ts's isRateLimited) -- `false` (the default) for every
+   * pre-#61 call site. incidents.ts's escalation query excludes rows with
+   * this set, so Upkeep's own rate-limit backoff can never masquerade as a
+   * real outage. */
+  isRateLimited?: boolean;
 };
 
 /**
@@ -80,7 +86,7 @@ export async function writeCheckResult(
   status: CheckStatus,
   options: WriteCheckResultOptions = {},
 ): Promise<PersistResult> {
-  const { region = null, isConsensus = true } = options;
+  const { region = null, isConsensus = true, isRateLimited = false } = options;
   const { error } = await supabase.from("checks").insert({
     project_id: result.project_id,
     status,
@@ -90,6 +96,7 @@ export async function writeCheckResult(
     response_snippet: status === "up" ? null : result.response_snippet,
     region,
     is_consensus: isConsensus,
+    is_rate_limited: isRateLimited,
   });
 
   if (error) {

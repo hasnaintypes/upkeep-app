@@ -15,6 +15,8 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     retry_count: 1,
     expected_status: 200,
     check_type: "http",
+    check_interval_seconds: 300,
+    rate_limit_backoff_count: 0,
     expected_body_match: null,
     expected_json_path: null,
     expected_json_value: null,
