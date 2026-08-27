@@ -9,6 +9,7 @@ import type { CheckResult } from "./check.ts";
 const project: ClassifiableProject = { expected_status: 200, check_type: "http" };
 const tcpProject: ClassifiableProject = { expected_status: 200, check_type: "tcp" };
 const dnsProject: ClassifiableProject = { expected_status: 200, check_type: "dns" };
+const sslProject: ClassifiableProject = { expected_status: 200, check_type: "ssl" };
 
 function result(overrides: Partial<CheckResult>): CheckResult {
   return {
@@ -189,6 +190,69 @@ Deno.test("classifyCheck: dns, timed out -> down, not unknown", () => {
         response_time_ms: 5000,
       }),
       dnsProject,
+    ),
+    "down",
+  );
+});
+
+// #57: check_type = "ssl" -- only three outcomes (up/degraded/down), no
+// "unknown" at all, per this issue's own acceptance criteria. Any failure
+// (connection error, timeout, or an invalid/expired certificate -- all of
+// which runSslCheck surfaces as a plain error_message, see check.ts) is
+// `down`; a valid-but-expiring-soon certificate (result.certExpiringSoon,
+// computed by runSslCheck itself) is `degraded`; otherwise `up`.
+Deno.test("classifyCheck: ssl, valid certificate not expiring soon -> up", () => {
+  assertEquals(
+    classifyCheck(
+      result({ http_status: null, certExpiringSoon: false }),
+      sslProject,
+    ),
+    "up",
+  );
+});
+
+Deno.test("classifyCheck: ssl, valid certificate expiring within the warning window -> degraded, not down", () => {
+  assertEquals(
+    classifyCheck(
+      result({ http_status: null, certExpiringSoon: true }),
+      sslProject,
+    ),
+    "degraded",
+  );
+});
+
+Deno.test("classifyCheck: ssl, invalid/expired certificate -> down", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        error_message: "Certificate error: DEPTH_ZERO_SELF_SIGNED_CERT",
+      }),
+      sslProject,
+    ),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: ssl, connection-level error -> down, not unknown", () => {
+  assertEquals(
+    classifyCheck(
+      result({ http_status: null, error_message: "Connection refused" }),
+      sslProject,
+    ),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: ssl, timed out -> down", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        timed_out: true,
+        error_message: "Timed out after 5000ms",
+      }),
+      sslProject,
     ),
     "down",
   );

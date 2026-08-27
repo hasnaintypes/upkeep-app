@@ -1,5 +1,6 @@
 // Health-check execution (PRD §5.2, Phase 3, issues #21-#22; TCP check
-// type, Phase 9, issue #55; DNS check type, Phase 9, issue #56).
+// type, Phase 9, issue #55; DNS check type, Phase 9, issue #56; SSL/TLS
+// certificate check type, Phase 9, issue #57).
 //
 // Scope note: this module only fires the check and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
@@ -15,20 +16,23 @@
 // status-classification step should branch on `timed_out` directly rather
 // than string-matching the message (e.g. for "unknown" vs "down").
 //
-// `check_type`: `runHealthCheck` below is a thin dispatcher over three
+// `check_type`: `runHealthCheck` below is a thin dispatcher over four
 // otherwise-independent runners -- `runHttpCheck` (the original #21-#22
-// implementation, unchanged), `runTcpCheck` (#55), and `runDnsCheck` (#56).
-// All three produce the same `CheckResult` shape so classify.ts/retry.ts/
-// persist.ts don't need to know which kind of check produced it -- a tcp
-// or dns result simply always has `http_status: null`/`response_snippet:
+// implementation, unchanged), `runTcpCheck` (#55), `runDnsCheck` (#56), and
+// `runSslCheck` (#57). All four produce the same `CheckResult` shape so
+// classify.ts/retry.ts/persist.ts don't need to know which kind of check
+// produced it -- a tcp/dns/ssl result simply always has `http_status:
 // null` (nothing to grade there), exactly like an HTTP result that never
 // got a response. See classify.ts's own top comment for how `check_type`
-// changes status classification itself.
+// changes status classification itself. `runSslCheck`'s own module-level
+// doc comment (below) explains why it uses a hand-rolled minimal TLS
+// client (tls-cert.ts) instead of a normal TLS API call.
+import { fetchLeafCertificateValidity } from "./tls-cert.ts";
 
 /** The subset of a `projects` row this module needs. Kept minimal and
  * local rather than importing the Next.js app's generated Database type --
  * this Edge Function is a separate Deno runtime/module graph. */
-export type CheckType = "http" | "tcp" | "dns";
+export type CheckType = "http" | "tcp" | "dns" | "ssl";
 
 export type DueProject = {
   id: string;
@@ -57,6 +61,15 @@ export type CheckResult = {
    * itself (a single attempt); retry.ts overwrites this on the final result
    * it returns so callers can see whether a retry was needed (#23). */
   attempts: number;
+  /** True only for `check_type = "ssl"` (#57): the certificate is currently
+   * valid (`error_message` is null) but expires within
+   * `SSL_EXPIRY_WARNING_DAYS` below. classify.ts uses this to produce
+   * "degraded" instead of "up" without needing its own expiry math, since
+   * `runSslCheck` already parsed the certificate. Optional (not just
+   * `false`) so every other runner/call site can omit it entirely rather
+   * than needing to touch every existing `CheckResult` literal in this
+   * codebase just to add a field that means nothing for their check type. */
+  certExpiringSoon?: boolean;
 };
 
 /** Matches the `checks.response_snippet` column's intended use (PRD §6) --
@@ -352,6 +365,150 @@ async function runDnsCheck(project: DueProject): Promise<CheckResult> {
   }
 }
 
+/** How many days out from expiry an otherwise-valid certificate starts
+ * producing a "degraded" check instead of "up" (#57's acceptance criterion
+ * example: "e.g. 14 days"). A single global constant for v1, not a
+ * per-project column -- the acceptance criteria only ask for *a*
+ * configured warning window, not a per-project-configurable one, so a new
+ * column would be scope creep beyond what's actually asked for here (same
+ * "boring, extensible" precedent as keep-alive's own fixed 10-minute
+ * cadence -- see supabase/migrations/*_add_keep_alive_scheduling.sql's
+ * comment). Revisit as a per-project column if that turns out to matter
+ * for a real project. */
+export const SSL_EXPIRY_WARNING_DAYS = 14;
+
+/**
+ * Connects to `check_type = 'ssl'`'s "host:port" target (same format as
+ * tcp -- reuses `parseTcpTarget`) and inspects the server's leaf
+ * certificate via `tls-cert.ts`'s hand-rolled minimal TLS 1.2 client --
+ * see that module's own top comment for exactly why a hand-rolled client
+ * is necessary here at all (short version: neither Deno's stable TLS API
+ * nor `node:tls` actually expose certificate details on Supabase's Edge
+ * Runtime, confirmed live, not assumed). Expired/not-yet-valid/self-signed
+ * -> `error_message` set (`down`, see classify.ts); valid but expiring
+ * within `SSL_EXPIRY_WARNING_DAYS` -> `certExpiringSoon: true` and the
+ * expiry date captured in `response_snippet` (this check type's own
+ * acceptance criterion -- "the expiry date captured somewhere visible on
+ * the check record"); otherwise a normal success. Never throws, same
+ * contract as the other runners.
+ *
+ * Scope boundary (documented here and in tls-cert.ts, not silently
+ * swallowed): this only detects expiry/not-yet-valid and self-signed
+ * certificates as "invalid" -- it does not validate the certificate's
+ * signature chain up to a trusted root CA (that would need a bundled
+ * trust store), so a certificate signed by a real but untrusted CA, or
+ * one with a hostname mismatch, is not caught by this check type.
+ *
+ * `fetchLeafCertificateValidity` has no timeout of its own -- enforced
+ * here with `Promise.race` against a plain timer, same approach
+ * `runTcpCheck` uses for `Deno.connect`. If it resolves only after the
+ * race has already timed out, it has already closed its own socket in
+ * its own `finally` block by the time it does -- there is nothing left
+ * for this function to clean up, unlike `runTcpCheck`'s straggler-socket
+ * handling.
+ */
+async function runSslCheck(project: DueProject): Promise<CheckResult> {
+  const startedAt = performance.now();
+  const target = parseTcpTarget(project.health_url);
+
+  if (!target) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: 0,
+      response_snippet: null,
+      error_message: `Invalid SSL target "${project.health_url}" -- expected "host:port".`,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+
+  const certPromise = fetchLeafCertificateValidity(target.hostname, target.port);
+  const timeoutPromise = new Promise<"timeout">((resolve) => {
+    setTimeout(() => resolve("timeout"), project.timeout_ms);
+  });
+
+  const outcome = await Promise.race([certPromise, timeoutPromise]);
+  const responseTimeMs = Math.round(performance.now() - startedAt);
+
+  if (outcome === "timeout") {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: `Timed out after ${project.timeout_ms}ms`,
+      timed_out: true,
+      attempts: 1,
+    };
+  }
+
+  if (outcome.error !== null) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: outcome.error,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+
+  const { notBefore, notAfter, selfSigned } = outcome.certificate;
+  const now = Date.now();
+
+  if (selfSigned) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: "Certificate error: self-signed certificate.",
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+  if (now < notBefore.getTime()) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: `Certificate error: not valid until ${notBefore.toISOString()}.`,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+  if (now > notAfter.getTime()) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: `Certificate error: expired on ${notAfter.toISOString()}.`,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+
+  const daysUntilExpiry = (notAfter.getTime() - now) / (24 * 60 * 60 * 1000);
+  const expiringSoon = daysUntilExpiry <= SSL_EXPIRY_WARNING_DAYS;
+
+  return {
+    project_id: project.id,
+    http_status: null,
+    response_time_ms: responseTimeMs,
+    response_snippet: expiringSoon
+      ? `Certificate expires ${notAfter.toISOString()} (in ${Math.max(0, Math.ceil(daysUntilExpiry))} day(s)).`
+      : null,
+    error_message: null,
+    timed_out: false,
+    attempts: 1,
+    certExpiringSoon: expiringSoon,
+  };
+}
+
 /** Dispatches to the runner matching `project.check_type` -- the one thing
  * every other module in this pipeline (retry.ts/classify.ts/persist.ts)
  * calls or reasons about, so neither of them needs its own check_type
@@ -359,6 +516,7 @@ async function runDnsCheck(project: DueProject): Promise<CheckResult> {
 export function runHealthCheck(project: DueProject): Promise<CheckResult> {
   if (project.check_type === "tcp") return runTcpCheck(project);
   if (project.check_type === "dns") return runDnsCheck(project);
+  if (project.check_type === "ssl") return runSslCheck(project);
   return runHttpCheck(project);
 }
 

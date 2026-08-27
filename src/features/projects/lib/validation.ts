@@ -224,8 +224,14 @@ export const createProjectSchema = z.object({
   is_public: z.boolean().optional(),
 }).superRefine((values, ctx) => {
   const checkType = values.check_type ?? "http";
+  // ssl reuses tcpTargetSchema as-is -- same "host:port" format, see
+  // check.ts's runSslCheck reusing parseTcpTarget for the same reason.
   const targetValidator =
-    checkType === "tcp" ? tcpTargetSchema : checkType === "dns" ? dnsTargetSchema : healthUrlSchema;
+    checkType === "tcp" || checkType === "ssl"
+      ? tcpTargetSchema
+      : checkType === "dns"
+        ? dnsTargetSchema
+        : healthUrlSchema;
   const targetResult = targetValidator.safeParse(values.health_url);
   if (!targetResult.success) {
     for (const issue of targetResult.error.issues) {

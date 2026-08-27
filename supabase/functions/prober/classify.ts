@@ -34,6 +34,16 @@
 // skips the HTTP-only rules that don't apply to a bare resolution (no
 // `http_status` to compare against `expected_status`, no response-time
 // degraded/waking grading).
+//
+// #57's `check_type === "ssl"` branch is simpler than either -- its own
+// acceptance criteria define exactly three outcomes (up/degraded/down),
+// no "unknown" at all: any failure (connection error, timeout, an
+// expired/invalid certificate) is `down`; a valid certificate expiring
+// within `check.ts`'s `SSL_EXPIRY_WARNING_DAYS` is `degraded` (a heads-up,
+// not treated identically to a hard outage, per this issue's own task
+// description); otherwise `up`. `result.certExpiringSoon` is computed by
+// `runSslCheck` itself (which already parsed the certificate), not
+// recomputed here.
 
 import type { CheckResult, CheckType } from "./check.ts";
 
@@ -75,6 +85,13 @@ export function classifyCheck(
       return "down";
     }
     return "up";
+  }
+
+  if (project.check_type === "ssl") {
+    if (result.error_message !== null) {
+      return "down";
+    }
+    return result.certExpiringSoon ? "degraded" : "up";
   }
 
   // Never got as far as an HTTP response, and it wasn't our own timeout

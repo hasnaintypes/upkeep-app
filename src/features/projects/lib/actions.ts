@@ -8,14 +8,15 @@ import { type HeaderMap, maskProjectHeaders, mergeHeaders } from "./headers";
 
 /**
  * Re-validates `health_url` server-side against whichever format its
- * `check_type` actually requires (#55/#56) -- `healthUrlSchema`'s https://
- * rule for `"http"` (the default, and the only option that existed before
- * #55), `tcpTargetSchema`'s "host:port" rule for `"tcp"`, or
+ * `check_type` actually requires (#55/#56/#57) -- `healthUrlSchema`'s
+ * https:// rule for `"http"` (the default, and the only option that
+ * existed before #55), `tcpTargetSchema`'s "host:port" rule for `"tcp"`
+ * and `"ssl"` (same target format, see validation.ts's own comment), or
  * `dnsTargetSchema`'s bare-hostname rule for `"dns"`. Shared by both
  * createProject and updateProject below so the two can't drift.
  */
 function validateHealthUrl(checkType: string | undefined, healthUrl: string) {
-  if (checkType === "tcp") return tcpTargetSchema.safeParse(healthUrl);
+  if (checkType === "tcp" || checkType === "ssl") return tcpTargetSchema.safeParse(healthUrl);
   if (checkType === "dns") return dnsTargetSchema.safeParse(healthUrl);
   return healthUrlSchema.safeParse(healthUrl);
 }

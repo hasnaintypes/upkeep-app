@@ -357,6 +357,7 @@ export function AddProjectForm({
               <SelectItem value="http">HTTP</SelectItem>
               <SelectItem value="tcp">TCP port</SelectItem>
               <SelectItem value="dns">DNS resolution</SelectItem>
+              <SelectItem value="ssl">SSL/TLS certificate</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -394,6 +395,24 @@ export function AddProjectForm({
             <FieldDescription>
               No scheme or port. Only whether this hostname resolves is
               checked -- no request is sent.
+            </FieldDescription>
+            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+          </Field>
+        ) : values.check_type === "ssl" ? (
+          <Field data-invalid={!!fieldErrors.health_url}>
+            <FieldLabel htmlFor="health_url">Health check target</FieldLabel>
+            <Input
+              id="health_url"
+              type="text"
+              placeholder="example.com:443"
+              required
+              aria-invalid={!!fieldErrors.health_url}
+              value={values.health_url}
+              onChange={(e) => updateField("health_url", e.target.value)}
+            />
+            <FieldDescription>
+              Enter as &quot;host:port&quot;. Checks the certificate is
+              valid and not expiring soon -- no request is sent.
             </FieldDescription>
             <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
           </Field>
