@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -140,6 +141,31 @@ export function AddProjectForm({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Empty until mounted, then set from window.location.origin -- computed
+  // in an effect (not inline during render) so the server-rendered HTML
+  // and the first client render match; window isn't available during SSR,
+  // and there's no NEXT_PUBLIC_SITE_URL env var in this app to fall back
+  // to instead (#54).
+  const [origin, setOrigin] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  // Only meaningful once the project actually exists (editing, not still
+  // being created) and the browser origin has resolved -- see the `origin`
+  // state comment above. `null` here is exactly "nothing to share yet"
+  // (#54's own acceptance criterion for a private, or not-yet-saved,
+  // project), not an error state.
+  const statusPageUrl = project?.id && origin ? `${origin}/status/${project.id}` : null;
+
+  async function handleCopyStatusPageUrl() {
+    if (!statusPageUrl) return;
+    await navigator.clipboard.writeText(statusPageUrl);
+    setLinkCopied(true);
+    notify.success("Copied to clipboard");
+  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -648,13 +674,38 @@ export function AddProjectForm({
                 </Field>
                 <FieldDescription className="-mt-2">
                   Makes this project&apos;s current status, uptime %, and
-                  response-time history visible to anyone with the link at{" "}
-                  <code className="rounded-sm bg-muted px-1 py-0.5 text-xs">
-                    /status/{project?.id ?? "..."}
-                  </code>
-                  . The health check {values.check_type === "tcp" ? "target" : "URL"},
+                  response-time history visible to anyone with the link. The
+                  health check {values.check_type === "tcp" ? "target" : "URL"},
                   custom headers, and any auth tokens are never included.
                 </FieldDescription>
+
+                {/* Only once the project actually exists (editing, not
+                    mid-create) -- see the statusPageUrl comment above. A
+                    project that's public but not yet saved has no id/no
+                    link to share yet, same as one that's still private
+                    (#54's own acceptance criterion). */}
+                {values.is_public && statusPageUrl && (
+                  <Field>
+                    <FieldLabel htmlFor="status_page_url">Shareable link</FieldLabel>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="status_page_url"
+                        readOnly
+                        value={statusPageUrl}
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Copy status page link"
+                        onClick={() => void handleCopyStatusPageUrl()}
+                      >
+                        {linkCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                      </Button>
+                    </div>
+                  </Field>
+                )}
               </FieldGroup>
             </AccordionContent>
           </AccordionItem>
