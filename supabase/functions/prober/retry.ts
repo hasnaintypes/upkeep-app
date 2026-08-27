@@ -6,7 +6,8 @@
 // http_status matches the project's expected_status) -- just enough to
 // decide "should I retry this attempt". It is NOT the full up/down/degraded/
 // waking/unknown status classification (a separate, later Phase 3 task),
-// which also weighs response time and (#58) `expected_body_match`.
+// which also weighs response time, (#58) `expected_body_match`, and (#59)
+// `expected_json_path`/`expected_json_value`.
 //
 // #58 keyword/content match: deliberately still excluded from
 // `isAttemptSuccessful` below, per this scope note above -- a
@@ -15,6 +16,13 @@
 // it's actually `down`. Reconsider only if a real project shows this
 // causing false-down reports from a genuinely transient body blip that a
 // retry would have smoothed over -- not speculatively widened here.
+//
+// #59 JSON path/value assertion: same exclusion, same reasoning --
+// `runHttpCheck` never sets this function's `result.error_message` for a
+// failed assertion (only the separate `jsonAssertionFailed`/
+// `jsonAssertionError` fields, see check.ts), so a status-matching-but-
+// failed-assertion response already counts as "successful" here without
+// any extra code, consistent with #58's own precedent.
 //
 // #55/#56/#57 (TCP/DNS/SSL check types): none of the three has an
 // `http_status` to compare against `expected_status` (always null, see

@@ -97,7 +97,13 @@ export async function runManualCheck(
     status,
     http_status: result.http_status,
     response_time_ms: result.response_time_ms,
-    error_message: result.error_message,
+    // Falls back to `jsonAssertionError` (#59), same reasoning as
+    // persist.ts's own `error_message` column write -- a JSON path/value
+    // assertion failure is a successful response as far as CheckResult's
+    // own `error_message` field is concerned (see classify.ts's top
+    // comment), so this response would otherwise report `null` for a
+    // check this same call just classified/persisted as `down`.
+    error_message: result.error_message ?? result.jsonAssertionError ?? null,
     persisted: persisted.persisted,
     persist_error: persisted.error ?? null,
     incident,

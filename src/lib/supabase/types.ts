@@ -306,6 +306,8 @@ export type Database = {
           created_at: string
           description: string | null
           expected_body_match: string | null
+          expected_json_path: string | null
+          expected_json_value: string | null
           expected_status: number
           headers: Json | null
           health_url: string
@@ -335,6 +337,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           expected_body_match?: string | null
+          expected_json_path?: string | null
+          expected_json_value?: string | null
           expected_status?: number
           headers?: Json | null
           health_url: string
@@ -364,6 +368,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           expected_body_match?: string | null
+          expected_json_path?: string | null
+          expected_json_value?: string | null
           expected_status?: number
           headers?: Json | null
           health_url?: string
@@ -409,6 +415,8 @@ export type Database = {
           created_at: string
           description: string | null
           expected_body_match: string | null
+          expected_json_path: string | null
+          expected_json_value: string | null
           expected_status: number
           headers: Json | null
           health_url: string
@@ -447,6 +455,8 @@ export type Database = {
           created_at: string
           description: string | null
           expected_body_match: string | null
+          expected_json_path: string | null
+          expected_json_value: string | null
           expected_status: number
           headers: Json | null
           health_url: string

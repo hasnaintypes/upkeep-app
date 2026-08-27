@@ -142,6 +142,41 @@ Deno.test("classifyCheck: wrong http_status takes priority over bodyMatchFailed 
   );
 });
 
+// #59: expected_json_path/expected_json_value -- a matching status with a
+// failed JSON path/value assertion is `down`, same placement/priority as
+// #58's bodyMatchFailed above.
+Deno.test("classifyCheck: jsonAssertionFailed true, matching status -> down, even though status matched", () => {
+  assertEquals(
+    classifyCheck(result({ jsonAssertionFailed: true }), project),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: jsonAssertionFailed true takes priority over an otherwise-fast/matching response", () => {
+  assertEquals(
+    classifyCheck(result({ jsonAssertionFailed: true, response_time_ms: 10 }), project),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: jsonAssertionFailed false (or unset) -> normal classification, unaffected (#59 backward-compat AC)", () => {
+  assertEquals(
+    classifyCheck(result({ jsonAssertionFailed: false, response_time_ms: 250 }), project),
+    "up",
+  );
+  assertEquals(
+    classifyCheck(result({ response_time_ms: 250 }), project), // jsonAssertionFailed omitted entirely
+    "up",
+  );
+});
+
+Deno.test("classifyCheck: wrong http_status takes priority over jsonAssertionFailed (both down, but for the reported reason to make sense)", () => {
+  assertEquals(
+    classifyCheck(result({ http_status: 500, jsonAssertionFailed: true }), project),
+    "down",
+  );
+});
+
 // #55: check_type = "tcp" -- only ever up/down, regardless of http_status
 // (always null for a TCP result) or response_time_ms (no degraded/waking
 // concept without a response body to have been slow to deliver).

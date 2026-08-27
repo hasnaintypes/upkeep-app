@@ -16,6 +16,8 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     expected_status: 200,
     check_type: "http",
     expected_body_match: null,
+    expected_json_path: null,
+    expected_json_value: null,
     ...overrides,
   };
 }

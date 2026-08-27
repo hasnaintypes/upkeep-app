@@ -31,6 +31,8 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     expected_status: 200,
     check_type: "tcp",
     expected_body_match: null,
+    expected_json_path: null,
+    expected_json_value: null,
     ...overrides,
   };
 }
@@ -328,6 +330,104 @@ Deno.test("runHealthCheck: http, expected_body_match found beyond the truncated 
       fakeProject({ check_type: "http", expected_body_match: "all systems healthy" }),
     );
     assertEquals(result.bodyMatchFailed, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path/value set and matching -> jsonAssertionFailed false, error_message still null", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(JSON.stringify({ status: "ok" }), { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: "$.status", expected_json_value: "ok" }),
+    );
+    assertEquals(result.jsonAssertionFailed, false);
+    assertEquals(result.jsonAssertionError, null);
+    assertEquals(result.error_message, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path/value set but value mismatches -> jsonAssertionFailed true, mismatch captured (#59 AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(JSON.stringify({ status: "degraded" }), { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: "$.status", expected_json_value: "ok" }),
+    );
+    assertEquals(result.http_status, 200);
+    assertEquals(result.jsonAssertionFailed, true);
+    assertEquals(result.jsonAssertionError, 'JSON path "$.status" expected "ok", got "degraded".');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path set but body isn't valid JSON -> jsonAssertionFailed true, parse error captured (#59 AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("<html>not json</html>", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: "$.status", expected_json_value: "ok" }),
+    );
+    assertEquals(result.jsonAssertionFailed, true);
+    assertEquals(result.jsonAssertionError?.startsWith("Response body is not valid JSON"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path set but path missing from body -> jsonAssertionFailed true (#59 AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(JSON.stringify({ other: "field" }), { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: "$.status", expected_json_value: "ok" }),
+    );
+    assertEquals(result.jsonAssertionFailed, true);
+    assertEquals(result.jsonAssertionError, 'JSON path "$.status" not found in response body.');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path/value unset -> jsonAssertionFailed always false (#59 backward-compat AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("anything at all", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: null, expected_json_value: null }),
+    );
+    assertEquals(result.jsonAssertionFailed, false);
+    assertEquals(result.jsonAssertionError, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_json_path set but expected_json_value unset -> treated as not configured", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(JSON.stringify({ status: "down" }), { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_json_path: "$.status", expected_json_value: null }),
+    );
+    assertEquals(result.jsonAssertionFailed, false);
+    assertEquals(result.jsonAssertionError, null);
   } finally {
     globalThis.fetch = originalFetch;
   }

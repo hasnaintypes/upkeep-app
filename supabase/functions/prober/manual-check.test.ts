@@ -21,6 +21,8 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     expected_status: 200,
     check_type: "http",
     expected_body_match: null,
+    expected_json_path: null,
+    expected_json_value: null,
     ...overrides,
   };
 }
@@ -208,4 +210,64 @@ Deno.test("runManualCheck: expected_body_match missing from body -> down even wi
   // the actual (wrong) body is the diagnostic signal here, since there's
   // no error_message for a completed-but-wrong response.
   assertEquals(inserted[0].response_snippet, "<html>maintenance page</html>");
+});
+
+Deno.test("runManualCheck: expected_json_path/value matching -> up, full pipeline (#59)", async () => {
+  const { client, inserted } = fakeClient(
+    fakeProject({ expected_json_path: "$.status", expected_json_value: "ok" }),
+  );
+
+  const body = await withFakeFetch(
+    () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.status, "up");
+  assertEquals(inserted[0].status, "up");
+  assertEquals(inserted[0].error_message, null);
+});
+
+Deno.test("runManualCheck: expected_json_path/value mismatch -> down even with matching http_status, mismatch captured in error_message, full pipeline (#59 AC)", async () => {
+  const { client, inserted } = fakeClient(
+    fakeProject({ expected_json_path: "$.status", expected_json_value: "ok" }),
+  );
+
+  const body = await withFakeFetch(
+    () => new Response(JSON.stringify({ status: "degraded" }), { status: 200 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.http_status, 200);
+  assertEquals(body.status, "down");
+  assertEquals(inserted[0].status, "down");
+  assertEquals(
+    inserted[0].error_message,
+    'JSON path "$.status" expected "ok", got "degraded".',
+  );
+});
+
+Deno.test("runManualCheck: expected_json_path set but body isn't valid JSON -> down, parse error captured in error_message, full pipeline (#59 AC)", async () => {
+  const { client, inserted } = fakeClient(
+    fakeProject({ expected_json_path: "$.status", expected_json_value: "ok" }),
+  );
+
+  const body = await withFakeFetch(
+    () => new Response("<html>not json</html>", { status: 200 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.status, "down");
+  assertEquals(
+    (inserted[0].error_message as string).startsWith("Response body is not valid JSON"),
+    true,
+  );
 });

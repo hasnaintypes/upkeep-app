@@ -6,6 +6,15 @@
 // documents the column itself as "nullable, truncated body on failure", and
 // there's no debugging value in storing a full 2000-char body for every
 // single healthy check at whatever interval a project is configured for.
+//
+// `error_message` falls back to `result.jsonAssertionError` (#59) when the
+// check's own `error_message` is null -- a JSON path/value assertion
+// failure is a successful response (check.ts never sets `error_message`
+// itself in that path), but its specific mismatch/parse-error text still
+// needs to reach this column so it's visible on the persisted row and so
+// incidents.ts's `deriveIncidentCause` (which reads `checks.error_message`
+// directly, not CheckResult) can use it instead of falling back to a
+// generic "Unexpected HTTP status" message.
 import type { CheckResult } from "./check.ts";
 import type { CheckStatus } from "./classify.ts";
 
@@ -52,7 +61,7 @@ export async function writeCheckResult(
     status,
     http_status: result.http_status,
     response_time_ms: result.response_time_ms,
-    error_message: result.error_message,
+    error_message: result.error_message ?? result.jsonAssertionError ?? null,
     response_snippet: status === "up" ? null : result.response_snippet,
   });
 

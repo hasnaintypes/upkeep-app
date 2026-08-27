@@ -1,6 +1,7 @@
 // Health-check execution (PRD §5.2, Phase 3, issues #21-#22; TCP check
 // type, Phase 9, issue #55; DNS check type, Phase 9, issue #56; SSL/TLS
-// certificate check type, Phase 9, issue #57).
+// certificate check type, Phase 9, issue #57; keyword/content match,
+// Phase 9, issue #58; JSON path/value assertion, Phase 9, issue #59).
 //
 // Scope note: this module only fires the check and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
@@ -28,6 +29,7 @@
 // doc comment (below) explains why it uses a hand-rolled minimal TLS
 // client (tls-cert.ts) instead of a normal TLS API call.
 import { fetchLeafCertificateValidity } from "./tls-cert.ts";
+import { evaluateJsonAssertion } from "./json-path.ts";
 
 /** The subset of a `projects` row this module needs. Kept minimal and
  * local rather than importing the Next.js app's generated Database type --
@@ -50,6 +52,14 @@ export type DueProject = {
    * criterion). Only meaningful for `check_type = "http"`; the other
    * three check types have no response body to search at all. */
   expected_body_match: string | null;
+  /** JSON path/value assertion (PRD §5.2, Phase 9, issue #59) -- both
+   * null/empty means "not configured", same backward-compatibility
+   * precedent as `expected_body_match` above. Only meaningful for
+   * `check_type = "http"`. Requires *both* fields set to run -- a path
+   * with no expected value (or vice versa) is treated as unconfigured
+   * rather than guessing at intent. */
+  expected_json_path: string | null;
+  expected_json_value: string | null;
 };
 
 export type CheckResult = {
@@ -86,6 +96,25 @@ export type CheckResult = {
    * `expected_body_match` is unset, by construction (#58's own backward-
    * compatibility acceptance criterion). */
   bodyMatchFailed?: boolean;
+  /** True only when `check_type = "http"` and both
+   * `project.expected_json_path`/`expected_json_value` are set but the
+   * assertion against the *full* response body failed -- invalid JSON, an
+   * unresolvable path, or a value mismatch (#59). Computed here in
+   * `runHttpCheck`, same placement/reasoning as `bodyMatchFailed` above.
+   * Optional, same reasoning as `certExpiringSoon`/`bodyMatchFailed` --
+   * every other runner/outcome simply omits it. */
+  jsonAssertionFailed?: boolean;
+  /** Human-readable reason for `jsonAssertionFailed` (parse error, missing
+   * path, or value mismatch), surfaced through persist.ts into the
+   * persisted `checks.error_message` column and from there into
+   * incidents.ts's `deriveIncidentCause` (#59's own acceptance criterion:
+   * "the mismatch/parse error captured in error_message"). Deliberately
+   * kept separate from this type's own `error_message` field, which
+   * classify.ts's "unknown" branch treats as "the check itself couldn't
+   * execute" -- reusing it here would misclassify a successful-response-
+   * but-failed-assertion check as `unknown` instead of `down`. Always
+   * null/undefined when `jsonAssertionFailed` is false/undefined. */
+  jsonAssertionError?: string | null;
 };
 
 /** Matches the `checks.response_snippet` column's intended use (PRD §6) --
@@ -170,6 +199,15 @@ async function runHttpCheck(project: DueProject): Promise<CheckResult> {
       ? !bodyText.includes(project.expected_body_match)
       : false;
 
+    // Checked against the *full* `bodyText`, same reasoning as
+    // `bodyMatchFailed` above (#59). Both `expected_json_path` and
+    // `expected_json_value` must be set to run the assertion at all --
+    // see `DueProject.expected_json_path`'s own doc comment.
+    const jsonAssertion =
+      project.expected_json_path && project.expected_json_value !== null
+        ? evaluateJsonAssertion(bodyText, project.expected_json_path, project.expected_json_value)
+        : null;
+
     return {
       project_id: project.id,
       http_status: response.status,
@@ -179,6 +217,8 @@ async function runHttpCheck(project: DueProject): Promise<CheckResult> {
       timed_out: false,
       attempts: 1,
       bodyMatchFailed,
+      jsonAssertionFailed: jsonAssertion?.failed ?? false,
+      jsonAssertionError: jsonAssertion?.failed ? jsonAssertion.message : null,
     };
   } catch (err) {
     const responseTimeMs = Math.round(performance.now() - startedAt);

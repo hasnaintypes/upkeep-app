@@ -1,7 +1,8 @@
 // Status classification (PRD §5.2, Phase 3, issue #24; TCP check type,
 // Phase 9, issue #55; DNS check type, Phase 9, issue #56; keyword/content
-// match, Phase 9, issue #58): maps a check's raw outcome to one of
-// up/down/degraded/waking/unknown.
+// match, Phase 9, issue #58; JSON path/value assertion, Phase 9, issue
+// #59): maps a check's raw outcome to one of up/down/degraded/waking/
+// unknown.
 //
 // Thresholds are the Phase 3 readiness-checklist decision recorded in
 // docs/ROADMAP.md -- not invented ad hoc here. If they ever need to change,
@@ -14,6 +15,20 @@
 // wrong body is `down` regardless of how fast the (wrong) response arrived,
 // per this issue's own acceptance criterion ("a matching status with a
 // missing/wrong body should classify as down, not up").
+//
+// #59's `expected_json_path`/`expected_json_value` assertion (see
+// `result.jsonAssertionFailed`, computed by the same `runHttpCheck` call)
+// is checked right alongside #58's `bodyMatchFailed`, same placement and
+// same reasoning -- a matching status with an invalid-JSON/missing-path/
+// mismatched-value body is `down` too. `runHttpCheck` deliberately leaves
+// this type's own `error_message` field null on an assertion failure
+// (same as `bodyMatchFailed`) and instead carries the specific mismatch/
+// parse-error text on a separate `jsonAssertionError` field, precisely so
+// it can never spuriously trip the generic `error_message`-based
+// "unknown" branch below -- persist.ts (not this function) is what
+// surfaces `jsonAssertionError` into the persisted `checks.error_message`
+// column, satisfying #59's own acceptance criterion without this
+// classifier needing to know that detail exists.
 //
 // #55's `check_type === "tcp"` branch is handled first and separately
 // (see below) rather than folded into the HTTP-oriented rules underneath:
@@ -127,6 +142,15 @@ export function classifyCheck(
   // `expected_body_match` isn't configured (see check.ts), so this is a
   // no-op for every project that predates #58.
   if (result.bodyMatchFailed) {
+    return "down";
+  }
+
+  // Matching status, but the configured JSON path assertion failed --
+  // invalid JSON, an unresolvable path, or a value mismatch (#59). Always
+  // `false`/`undefined` when `expected_json_path`/`expected_json_value`
+  // aren't both configured (see check.ts), so this is a no-op for every
+  // project that predates #59.
+  if (result.jsonAssertionFailed) {
     return "down";
   }
 
