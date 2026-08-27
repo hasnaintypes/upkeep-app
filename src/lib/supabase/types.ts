@@ -543,6 +543,10 @@ export type Database = {
           uptime_percentage: number
         }[]
       }
+      is_project_publicly_visible: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
       record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
