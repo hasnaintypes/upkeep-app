@@ -6,7 +6,15 @@
 // http_status matches the project's expected_status) -- just enough to
 // decide "should I retry this attempt". It is NOT the full up/down/degraded/
 // waking/unknown status classification (a separate, later Phase 3 task),
-// which will also weigh response time, expected_body_match, etc.
+// which also weighs response time and (#58) `expected_body_match`.
+//
+// #58 keyword/content match: deliberately still excluded from
+// `isAttemptSuccessful` below, per this scope note above -- a
+// status-matching-but-wrong-body response counts as a "successful attempt"
+// for retry purposes (no retry triggered), and classify.ts alone decides
+// it's actually `down`. Reconsider only if a real project shows this
+// causing false-down reports from a genuinely transient body blip that a
+// retry would have smoothed over -- not speculatively widened here.
 //
 // #55/#56/#57 (TCP/DNS/SSL check types): none of the three has an
 // `http_status` to compare against `expected_status` (always null, see

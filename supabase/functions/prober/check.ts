@@ -44,6 +44,12 @@ export type DueProject = {
   retry_count: number;
   expected_status: number;
   check_type: CheckType;
+  /** Keyword/content match check (PRD §5.2, Phase 9, issue #58) --
+   * `null`/empty means "not configured", preserving every existing
+   * project's current behavior unchanged (#58's own acceptance
+   * criterion). Only meaningful for `check_type = "http"`; the other
+   * three check types have no response body to search at all. */
+  expected_body_match: string | null;
 };
 
 export type CheckResult = {
@@ -70,6 +76,16 @@ export type CheckResult = {
    * than needing to touch every existing `CheckResult` literal in this
    * codebase just to add a field that means nothing for their check type. */
   certExpiringSoon?: boolean;
+  /** True only when `check_type = "http"` and `project.expected_body_match`
+   * is set but the *full* (untruncated) response body doesn't contain it
+   * (#58) -- computed here in `runHttpCheck`, not in classify.ts, since
+   * `response_snippet` is truncated to `RESPONSE_SNIPPET_MAX_LENGTH` and a
+   * match string past that cutoff would otherwise produce a false
+   * "missing" result. Optional, same reasoning as `certExpiringSoon`
+   * above -- every other runner/outcome simply omits it. Never true when
+   * `expected_body_match` is unset, by construction (#58's own backward-
+   * compatibility acceptance criterion). */
+  bodyMatchFailed?: boolean;
 };
 
 /** Matches the `checks.response_snippet` column's intended use (PRD §6) --
@@ -144,6 +160,15 @@ async function runHttpCheck(project: DueProject): Promise<CheckResult> {
     // Timing intentionally stops after reading the body, not right after
     // headers arrive -- a slow-streaming response is still a slow check.
     const responseTimeMs = Math.round(performance.now() - startedAt);
+    // Checked against the *full* `bodyText`, not the truncated
+    // `response_snippet` below (#58) -- a match string past
+    // RESPONSE_SNIPPET_MAX_LENGTH would otherwise be wrongly reported as
+    // missing. `!project.expected_body_match` (unset/empty) always
+    // resolves to `false` here, matching #58's own backward-compatibility
+    // acceptance criterion.
+    const bodyMatchFailed = project.expected_body_match
+      ? !bodyText.includes(project.expected_body_match)
+      : false;
 
     return {
       project_id: project.id,
@@ -153,6 +178,7 @@ async function runHttpCheck(project: DueProject): Promise<CheckResult> {
       error_message: null,
       timed_out: false,
       attempts: 1,
+      bodyMatchFailed,
     };
   } catch (err) {
     const responseTimeMs = Math.round(performance.now() - startedAt);

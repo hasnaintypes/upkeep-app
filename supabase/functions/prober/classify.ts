@@ -1,15 +1,19 @@
 // Status classification (PRD §5.2, Phase 3, issue #24; TCP check type,
-// Phase 9, issue #55; DNS check type, Phase 9, issue #56): maps a check's
-// raw outcome to one of up/down/degraded/waking/unknown.
+// Phase 9, issue #55; DNS check type, Phase 9, issue #56; keyword/content
+// match, Phase 9, issue #58): maps a check's raw outcome to one of
+// up/down/degraded/waking/unknown.
 //
 // Thresholds are the Phase 3 readiness-checklist decision recorded in
 // docs/ROADMAP.md -- not invented ad hoc here. If they ever need to change,
 // update the roadmap entry and this file together so they can't drift apart.
 //
-// Deliberately excludes `expected_body_match` (keyword/JSON-path assertion
-// against the response body) -- that's PRD §5.2's "additional check types"
-// list, tracked as its own Phase 9 roadmap task, not part of this basic
-// five-way classification.
+// #58's `expected_body_match` check (see `result.bodyMatchFailed`, computed
+// by check.ts's `runHttpCheck` against the *full* response body, not the
+// truncated `response_snippet`) is checked right after the `expected_status`
+// match, before the response-time thresholds -- a matching status with the
+// wrong body is `down` regardless of how fast the (wrong) response arrived,
+// per this issue's own acceptance criterion ("a matching status with a
+// missing/wrong body should classify as down, not up").
 //
 // #55's `check_type === "tcp"` branch is handled first and separately
 // (see below) rather than folded into the HTTP-oriented rules underneath:
@@ -114,6 +118,15 @@ export function classifyCheck(
 
   // Got a response, but not the one configured as correct.
   if (result.http_status !== project.expected_status) {
+    return "down";
+  }
+
+  // Matching status, but the configured keyword/string isn't in the body
+  // (#58) -- e.g. a health endpoint returning 200 with a generic error
+  // page during a partial outage. Always `false`/`undefined` when
+  // `expected_body_match` isn't configured (see check.ts), so this is a
+  // no-op for every project that predates #58.
+  if (result.bodyMatchFailed) {
     return "down";
   }
 

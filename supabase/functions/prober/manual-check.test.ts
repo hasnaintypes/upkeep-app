@@ -20,6 +20,7 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     retry_count: 0,
     expected_status: 200,
     check_type: "http",
+    expected_body_match: null,
     ...overrides,
   };
 }
@@ -168,4 +169,43 @@ Deno.test("runManualCheck: still writes a checks row (with response_snippet) whe
   assertEquals(body.status, "down");
   assertEquals(body.persisted, true);
   assertEquals(inserted[0].response_snippet, "server error body");
+});
+
+Deno.test("runManualCheck: expected_body_match present in body -> up, full pipeline (#58)", async () => {
+  const { client, inserted } = fakeClient(
+    fakeProject({ expected_body_match: "all systems healthy" }),
+  );
+
+  const body = await withFakeFetch(
+    () => new Response("status: all systems healthy", { status: 200 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.status, "up");
+  assertEquals(inserted[0].status, "up");
+});
+
+Deno.test("runManualCheck: expected_body_match missing from body -> down even with matching http_status, full pipeline (#58 AC)", async () => {
+  const { client, inserted } = fakeClient(
+    fakeProject({ expected_body_match: "all systems healthy" }),
+  );
+
+  const body = await withFakeFetch(
+    () => new Response("<html>maintenance page</html>", { status: 200 }),
+    async () => {
+      const response = await runManualCheck(client, "test-project");
+      return response.json();
+    },
+  );
+
+  assertEquals(body.http_status, 200);
+  assertEquals(body.status, "down");
+  assertEquals(inserted[0].status, "down");
+  // response_snippet is persisted for a non-"up" status (persist.ts) --
+  // the actual (wrong) body is the diagnostic signal here, since there's
+  // no error_message for a completed-but-wrong response.
+  assertEquals(inserted[0].response_snippet, "<html>maintenance page</html>");
 });

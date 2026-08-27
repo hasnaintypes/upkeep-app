@@ -107,6 +107,41 @@ Deno.test("classifyCheck: a slow response that still matches expected_status is 
   assertEquals(status, "waking");
 });
 
+// #58: expected_body_match -- a matching status with the wrong body is
+// `down`, regardless of response time (checked before the degraded/waking
+// thresholds, since a wrong-content response isn't "successful but slow").
+Deno.test("classifyCheck: bodyMatchFailed true, matching status -> down, even though status matched", () => {
+  assertEquals(
+    classifyCheck(result({ bodyMatchFailed: true }), project),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: bodyMatchFailed true takes priority over an otherwise-fast/matching response", () => {
+  assertEquals(
+    classifyCheck(result({ bodyMatchFailed: true, response_time_ms: 10 }), project),
+    "down",
+  );
+});
+
+Deno.test("classifyCheck: bodyMatchFailed false (or unset) -> normal classification, unaffected (#58 backward-compat AC)", () => {
+  assertEquals(
+    classifyCheck(result({ bodyMatchFailed: false, response_time_ms: 250 }), project),
+    "up",
+  );
+  assertEquals(
+    classifyCheck(result({ response_time_ms: 250 }), project), // bodyMatchFailed omitted entirely
+    "up",
+  );
+});
+
+Deno.test("classifyCheck: wrong http_status takes priority over bodyMatchFailed (both down, but for the reported reason to make sense)", () => {
+  assertEquals(
+    classifyCheck(result({ http_status: 500, bodyMatchFailed: true }), project),
+    "down",
+  );
+});
+
 // #55: check_type = "tcp" -- only ever up/down, regardless of http_status
 // (always null for a TCP result) or response_time_ms (no degraded/waking
 // concept without a response body to have been slow to deliver).

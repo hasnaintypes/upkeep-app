@@ -30,6 +30,7 @@ function fakeProject(overrides: Partial<DueProject> = {}): DueProject {
     retry_count: 0,
     expected_status: 200,
     check_type: "tcp",
+    expected_body_match: null,
     ...overrides,
   };
 }
@@ -263,6 +264,70 @@ Deno.test("runHealthCheck: check_type defaults to http behavior (existing projec
     const result = await runHealthCheck(fakeProject({ check_type: "http" }));
     assertEquals(fetchCalled, true);
     assertEquals(result.http_status, 200);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_body_match set and present in body -> bodyMatchFailed false", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("status: ok, all systems healthy", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_body_match: "all systems healthy" }),
+    );
+    assertEquals(result.bodyMatchFailed, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_body_match set but missing from body -> bodyMatchFailed true, even with matching status (#58 AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("<html>maintenance page</html>", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_status: 200, expected_body_match: "all systems healthy" }),
+    );
+    assertEquals(result.http_status, 200);
+    assertEquals(result.bodyMatchFailed, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_body_match unset -> bodyMatchFailed always false (#58 backward-compat AC)", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("anything at all", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(fakeProject({ check_type: "http", expected_body_match: null }));
+    assertEquals(result.bodyMatchFailed, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHealthCheck: http, expected_body_match found beyond the truncated response_snippet -> still correctly matched against the full body (#58)", async () => {
+  // response_snippet is truncated to 2000 chars (RESPONSE_SNIPPET_MAX_LENGTH)
+  // -- the match itself must still be checked against the *full* body, not
+  // that truncated snippet, or a match string past the cutoff would be
+  // wrongly reported as missing.
+  const padding = "x".repeat(2500);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(`${padding}all systems healthy`, { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHealthCheck(
+      fakeProject({ check_type: "http", expected_body_match: "all systems healthy" }),
+    );
+    assertEquals(result.bodyMatchFailed, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
