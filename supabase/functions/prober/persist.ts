@@ -15,6 +15,14 @@
 // incidents.ts's `deriveIncidentCause` (which reads `checks.error_message`
 // directly, not CheckResult) can use it instead of falling back to a
 // generic "Unexpected HTTP status" message.
+//
+// `region`/`is_consensus` (#60): both default to their pre-#60 values
+// (`null`/`true`) so every existing call site -- manual-check.ts's single
+// row, and any tick where the regional fan-out found nothing due -- keeps
+// writing exactly the row shape it always has. index.ts's regionally
+// fanned-out batch tick is the only caller that ever passes non-default
+// values, once per per-region raw row it writes alongside its one
+// consensus row (see the add_multi_region_probing migration).
 import type { CheckResult } from "./check.ts";
 import type { CheckStatus } from "./classify.ts";
 
@@ -45,6 +53,21 @@ export type PersistResult = {
   error?: string;
 };
 
+export type WriteCheckResultOptions = {
+  /** Which region produced this result (#60) -- `null` (the default) for
+   * a single/primary-region check or the one "consensus" row a regionally
+   * fanned-out tick writes per project; non-null only for the N raw
+   * per-region diagnostic rows written alongside that one consensus row. */
+  region?: string | null;
+  /** Whether this row counts toward incidents.ts's escalation/resolution
+   * streak (#60) -- `true` (the default) for every pre-#60 call site and
+   * for a regionally fanned-out tick's one consensus row; `false` only
+   * for its N raw per-region diagnostic rows, which exist purely for
+   * visibility (`checks.region` populated) and must not each
+   * independently count as "this project's status this round". */
+  isConsensus?: boolean;
+};
+
 /**
  * Writes one `checks` row for one project's final (post-retry, classified)
  * outcome. Never throws -- a write failure is reported in the returned
@@ -55,7 +78,9 @@ export async function writeCheckResult(
   supabase: InsertableClient,
   result: CheckResult,
   status: CheckStatus,
+  options: WriteCheckResultOptions = {},
 ): Promise<PersistResult> {
+  const { region = null, isConsensus = true } = options;
   const { error } = await supabase.from("checks").insert({
     project_id: result.project_id,
     status,
@@ -63,6 +88,8 @@ export async function writeCheckResult(
     response_time_ms: result.response_time_ms,
     error_message: result.error_message ?? result.jsonAssertionError ?? null,
     response_snippet: status === "up" ? null : result.response_snippet,
+    region,
+    is_consensus: isConsensus,
   });
 
   if (error) {
@@ -85,9 +112,9 @@ export async function writeCheckResult(
  */
 export function writeCheckResults(
   supabase: InsertableClient,
-  entries: Array<{ result: CheckResult; status: CheckStatus }>,
+  entries: Array<{ result: CheckResult; status: CheckStatus; options?: WriteCheckResultOptions }>,
 ): Promise<PersistResult[]> {
   return Promise.all(
-    entries.map(({ result, status }) => writeCheckResult(supabase, result, status)),
+    entries.map(({ result, status, options }) => writeCheckResult(supabase, result, status, options)),
   );
 }

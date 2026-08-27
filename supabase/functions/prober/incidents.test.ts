@@ -134,9 +134,11 @@ function fakeClient(options: {
         return {
           select: (_columns: string) => ({
             eq: (_column: string, _value: string) => ({
-              order: (_column: string, _opts: { ascending: boolean }) => ({
-                limit: (_n: number) =>
-                  Promise.resolve({ data: options.recentChecks, error: null }),
+              eq: (_column2: string, _value2: boolean) => ({
+                order: (_column: string, _opts: { ascending: boolean }) => ({
+                  limit: (_n: number) =>
+                    Promise.resolve({ data: options.recentChecks, error: null }),
+                }),
               }),
             }),
           }),
@@ -177,6 +179,53 @@ function fakeClient(options: {
 
   return { client, inserted, updated };
 }
+
+Deno.test("maybeOpenIncident: filters the recent-checks query to is_consensus = true (#60)", async () => {
+  const seenEqCalls: Array<[string, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table === "checks") {
+        return {
+          select: () => ({
+            eq: (column: string, value: string) => {
+              seenEqCalls.push([column, value]);
+              return {
+                eq: (column2: string, value2: boolean) => {
+                  seenEqCalls.push([column2, value2]);
+                  return {
+                    order: () => ({
+                      limit: () =>
+                        Promise.resolve({
+                          data: [check({ status: "down" }), check({ status: "down" })],
+                          error: null,
+                        }),
+                    }),
+                  };
+                },
+              };
+            },
+          }),
+        };
+      }
+      if (table === "incidents") {
+        return {
+          select: () => ({
+            eq: () => ({ is: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }),
+          }),
+          insert: () => Promise.resolve({ error: null }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    },
+  } as unknown as IncidentClient;
+
+  await maybeOpenIncident(client, "project-1", "down", 2);
+
+  assertEquals(seenEqCalls, [
+    ["project_id", "project-1"],
+    ["is_consensus", true],
+  ]);
+});
 
 Deno.test("maybeOpenIncident: an up check never queries anything -- 'not_failing'", async () => {
   const throwingClient = {
@@ -236,9 +285,11 @@ Deno.test("maybeOpenIncident: surfaces (not throws) a checks-query error", async
         return {
           select: () => ({
             eq: () => ({
-              order: () => ({
-                limit: () =>
-                  Promise.resolve({ data: null, error: { message: "connection reset" } }),
+              eq: () => ({
+                order: () => ({
+                  limit: () =>
+                    Promise.resolve({ data: null, error: { message: "connection reset" } }),
+                }),
               }),
             }),
           }),
@@ -386,12 +437,14 @@ Deno.test("maybeResolveIncident: surfaces (not throws) an update error", async (
         return {
           select: () => ({
             eq: () => ({
-              order: () => ({
-                limit: () =>
-                  Promise.resolve({
-                    data: [check({ status: "up" }), check({ status: "up" })],
-                    error: null,
-                  }),
+              eq: () => ({
+                order: () => ({
+                  limit: () =>
+                    Promise.resolve({
+                      data: [check({ status: "up" }), check({ status: "up" })],
+                      error: null,
+                    }),
+                }),
               }),
             }),
           }),

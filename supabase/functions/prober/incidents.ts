@@ -30,6 +30,16 @@
 // longer than its threshold *before* this code was deployed (there is no
 // detection/resolution running retroactively over pre-existing `checks`
 // rows).
+//
+// Multi-region probing (#60): both queries below filter to
+// `is_consensus = true` rows only. A regionally fanned-out batch tick
+// (index.ts) writes N raw per-region rows plus one consensus row per
+// project per round -- only that one consensus row (a majority vote
+// across regions, see region-probe.ts's deriveConsensusStatus) may count
+// toward the escalation/resolution streak. Every pre-#60 row already has
+// `is_consensus = true` (the column's default, see the
+// add_multi_region_probing migration), so this filter is a no-op for any
+// project that predates or otherwise isn't regionally probed.
 
 export const ESCALATION_THRESHOLD = 2;
 
@@ -124,14 +134,21 @@ export type IncidentClient = {
         column: string,
         value: string,
       ): {
-        order(
+        // Chained a second time for `.eq("is_consensus", true)` (#60) --
+        // see this module's own top comment.
+        eq(
           column: string,
-          opts: { ascending: boolean },
+          value: boolean,
         ): {
-          limit(n: number): PromiseLike<{
-            data: RecentCheck[] | null;
-            error: { message: string } | null;
-          }>;
+          order(
+            column: string,
+            opts: { ascending: boolean },
+          ): {
+            limit(n: number): PromiseLike<{
+              data: RecentCheck[] | null;
+              error: { message: string } | null;
+            }>;
+          };
         };
       };
     };
@@ -197,6 +214,7 @@ export async function maybeOpenIncident(
     .from("checks")
     .select("status, checked_at, http_status, error_message, response_time_ms")
     .eq("project_id", projectId)
+    .eq("is_consensus", true)
     .order("checked_at", { ascending: false })
     .limit(threshold);
 
@@ -320,6 +338,7 @@ export async function maybeResolveIncident(
     .from("checks")
     .select("status, checked_at, http_status, error_message, response_time_ms")
     .eq("project_id", projectId)
+    .eq("is_consensus", true)
     .order("checked_at", { ascending: false })
     .limit(threshold);
 

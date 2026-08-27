@@ -60,6 +60,23 @@ Deno.test("writeCheckResult: keeps response_snippet for degraded/waking/unknown 
   }
 });
 
+Deno.test("writeCheckResult: region/is_consensus default to null/true when no options are passed (#60 backward-compat)", async () => {
+  const { client, inserted } = fakeClient();
+  await writeCheckResult(client, fakeResult({}), "up");
+  assertEquals(inserted[0].region, null);
+  assertEquals(inserted[0].is_consensus, true);
+});
+
+Deno.test("writeCheckResult: writes explicit region/isConsensus options (#60)", async () => {
+  const { client, inserted } = fakeClient();
+  await writeCheckResult(client, fakeResult({}), "down", {
+    region: "us-east-1",
+    isConsensus: false,
+  });
+  assertEquals(inserted[0].region, "us-east-1");
+  assertEquals(inserted[0].is_consensus, false);
+});
+
 Deno.test("writeCheckResult: reports persisted=true on success", async () => {
   const { client } = fakeClient();
   const outcome = await writeCheckResult(client, fakeResult({}), "up");

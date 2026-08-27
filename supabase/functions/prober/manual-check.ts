@@ -26,6 +26,7 @@
 import type { DueProject } from "./check.ts";
 import { runHealthCheckWithRetry } from "./retry.ts";
 import { classifyCheck } from "./classify.ts";
+import { readEnv } from "./env.ts";
 import { writeCheckResult, type InsertableClient } from "./persist.ts";
 import { maybeOpenIncident, maybeResolveIncident, type IncidentClient } from "./incidents.ts";
 
@@ -75,7 +76,17 @@ export async function runManualCheck(
 
   const result = await runHealthCheckWithRetry(project);
   const status = classifyCheck(result, project);
-  const persisted = await writeCheckResult(supabaseAdmin, result, status);
+  // `region` is informational only here (#60) -- a manual check is always
+  // a single-vantage-point probe, whatever region it happens to execute
+  // in (Supabase's Edge Runtime routes it wherever's nearest, same as any
+  // other call that doesn't force a specific one via `x-region`), and
+  // `isConsensus` stays at persist.ts's own default (`true`): a manual
+  // check must keep counting toward incidents.ts's escalation/resolution
+  // streak exactly as it always has, unaffected by the batch tick's own
+  // multi-region fan-out.
+  const persisted = await writeCheckResult(supabaseAdmin, result, status, {
+    region: readEnv("SB_REGION") ?? null,
+  });
 
   // Same incident detection/resolution (#35/#36) as the batch path -- a
   // manual "run check now" can just as validly be the check that crosses

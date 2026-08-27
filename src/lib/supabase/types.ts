@@ -78,6 +78,7 @@ export type Database = {
           error_message: string | null
           http_status: number | null
           id: string
+          is_consensus: boolean
           project_id: string
           region: string | null
           response_snippet: string | null
@@ -89,6 +90,7 @@ export type Database = {
           error_message?: string | null
           http_status?: number | null
           id?: string
+          is_consensus?: boolean
           project_id: string
           region?: string | null
           response_snippet?: string | null
@@ -100,6 +102,7 @@ export type Database = {
           error_message?: string | null
           http_status?: number | null
           id?: string
+          is_consensus?: boolean
           project_id?: string
           region?: string | null
           response_snippet?: string | null

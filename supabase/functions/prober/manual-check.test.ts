@@ -57,8 +57,10 @@ function fakeClient(project: DueProject | null): {
         return {
           select: (_columns: string) => ({
             eq: (_column: string, _value: string) => ({
-              order: (_column: string, _opts: { ascending: boolean }) => ({
-                limit: (_n: number) => Promise.resolve({ data: [], error: null }),
+              eq: (_column2: string, _value2: boolean) => ({
+                order: (_column: string, _opts: { ascending: boolean }) => ({
+                  limit: (_n: number) => Promise.resolve({ data: [], error: null }),
+                }),
               }),
             }),
           }),
