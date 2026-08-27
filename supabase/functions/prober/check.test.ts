@@ -1,10 +1,11 @@
-// Unit tests for check.ts's TCP check type (#55) -- parseTcpTarget is pure
-// and tested directly; runHealthCheck's tcp dispatch is tested against a
-// stubbed `Deno.connect` (mirroring how manual-check.test.ts/
-// keep-alive.test.ts stub `globalThis.fetch` for the http path -- no real
-// network access needed). The existing HTTP path (runHealthCheck without a
-// check_type override) already has indirect coverage via those two files'
-// `withFakeFetch` tests, so it isn't duplicated here.
+// Unit tests for check.ts's TCP check type (#55) and DNS check type (#56).
+// parseTcpTarget is pure and tested directly; runHealthCheck's tcp/dns
+// dispatch is tested against a stubbed `Deno.connect`/`Deno.resolveDns`
+// (mirroring how manual-check.test.ts/keep-alive.test.ts stub
+// `globalThis.fetch` for the http path -- no real network access needed).
+// The existing HTTP path (runHealthCheck without a check_type override)
+// already has indirect coverage via those two files' `withFakeFetch`
+// tests, so it isn't duplicated here.
 import { assertEquals } from "@std/assert";
 import { parseTcpTarget, runHealthCheck, type DueProject } from "./check.ts";
 
@@ -36,6 +37,20 @@ async function withFakeConnect<T>(
     return await run();
   } finally {
     Deno.connect = original;
+  }
+}
+
+/** Same shape as `withFakeConnect`, for `Deno.resolveDns` (#56). */
+async function withFakeResolveDns<T>(
+  fakeResolveDns: typeof Deno.resolveDns,
+  run: () => Promise<T>,
+): Promise<T> {
+  const original = Deno.resolveDns;
+  Deno.resolveDns = fakeResolveDns;
+  try {
+    return await run();
+  } finally {
+    Deno.resolveDns = original;
   }
 }
 
@@ -146,4 +161,62 @@ Deno.test("runHealthCheck: check_type defaults to http behavior (existing projec
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+Deno.test("runHealthCheck: dns, successful resolution -> up-shaped result (no error, null http_status)", async () => {
+  const result = await withFakeResolveDns(
+    (() => Promise.resolve(["93.184.216.34"])) as unknown as typeof Deno.resolveDns,
+    () => runHealthCheck(fakeProject({ check_type: "dns", health_url: "example.com" })),
+  );
+
+  assertEquals(result.error_message, null);
+  assertEquals(result.timed_out, false);
+  assertEquals(result.http_status, null);
+  assertEquals(result.response_snippet, null);
+});
+
+Deno.test("runHealthCheck: dns, NXDOMAIN-style resolver error -> error_message set, not timed_out", async () => {
+  const result = await withFakeResolveDns(
+    (() =>
+      Promise.reject(
+        new Error('proto error: no records found for Query { name: Name("bad.invalid.") }'),
+      )) as unknown as typeof Deno.resolveDns,
+    () => runHealthCheck(fakeProject({ check_type: "dns", health_url: "bad.invalid" })),
+  );
+
+  assertEquals(result.timed_out, false);
+  assertEquals(
+    result.error_message,
+    'proto error: no records found for Query { name: Name("bad.invalid.") }',
+  );
+  assertEquals(result.http_status, null);
+});
+
+Deno.test("runHealthCheck: dns, resolution never settles -> times out at project.timeout_ms, not a hung invocation", async () => {
+  const result = await withFakeResolveDns(
+    // Never resolves/rejects -- same "not a hung function invocation"
+    // guard as the TCP timeout test above. runDnsCheck's own timeout race
+    // (not this fake) is what has to end the test in bounded time here.
+    (() => new Promise(() => {})) as unknown as typeof Deno.resolveDns,
+    () =>
+      runHealthCheck(
+        fakeProject({ check_type: "dns", health_url: "example.com", timeout_ms: 50 }),
+      ),
+  );
+
+  assertEquals(result.timed_out, true);
+  assertEquals(result.error_message, "Timed out after 50ms");
+  assertEquals(result.http_status, null);
+});
+
+Deno.test("runHealthCheck: dns, empty target -> error_message set, never throws", async () => {
+  const result = await runHealthCheck(
+    fakeProject({ check_type: "dns", health_url: "   " }),
+  );
+
+  assertEquals(result.timed_out, false);
+  assertEquals(
+    result.error_message,
+    'Invalid DNS target "   " -- expected a hostname.',
+  );
 });

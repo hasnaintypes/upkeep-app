@@ -1,6 +1,6 @@
 // Status classification (PRD §5.2, Phase 3, issue #24; TCP check type,
-// Phase 9, issue #55): maps a check's raw outcome to one of
-// up/down/degraded/waking/unknown.
+// Phase 9, issue #55; DNS check type, Phase 9, issue #56): maps a check's
+// raw outcome to one of up/down/degraded/waking/unknown.
 //
 // Thresholds are the Phase 3 readiness-checklist decision recorded in
 // docs/ROADMAP.md -- not invented ad hoc here. If they ever need to change,
@@ -22,6 +22,18 @@
 // from "couldn't reach it at all" -- for TCP, failing to connect *is* the
 // down signal, full stop; see this issue's own acceptance criterion:
 // "An unreachable host:port produces a down check").
+//
+// #56's `check_type === "dns"` branch is different from TCP's: the issue's
+// own task description explicitly asks for "down/unknown on resolution
+// failure per the same error-vs-failure distinction the classifier
+// already uses for HTTP checks" -- so unlike TCP, a DNS check keeps the
+// timeout-vs-other-error split (a timed-out resolution is `down`; an
+// NXDOMAIN/SERVFAIL-style resolver error that wasn't a timeout is
+// `unknown`, not `down`, mirroring the exact reasoning the HTTP branch
+// below already uses for "the check itself couldn't execute"). It only
+// skips the HTTP-only rules that don't apply to a bare resolution (no
+// `http_status` to compare against `expected_status`, no response-time
+// degraded/waking grading).
 
 import type { CheckResult, CheckType } from "./check.ts";
 
@@ -53,6 +65,16 @@ export function classifyCheck(
 ): CheckStatus {
   if (project.check_type === "tcp") {
     return result.error_message === null ? "up" : "down";
+  }
+
+  if (project.check_type === "dns") {
+    if (result.error_message !== null && !result.timed_out) {
+      return "unknown";
+    }
+    if (result.timed_out) {
+      return "down";
+    }
+    return "up";
   }
 
   // Never got as far as an HTTP response, and it wasn't our own timeout

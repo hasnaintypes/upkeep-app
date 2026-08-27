@@ -19,13 +19,14 @@ export const PROJECT_DEFAULTS = {
   isPublic: false,
 } as const;
 
-/** The two check types the prober supports (PRD §5.2, Phase 9, #55) --
- * `http` (the original GET/POST/HEAD check against `health_url` as a URL)
- * or `tcp` (a bare connection attempt against `health_url` parsed as
- * "host:port", no request/response body or status to grade). See
+/** The three check types the prober supports (PRD §5.2, Phase 9, #55/#56)
+ * -- `http` (the original GET/POST/HEAD check against `health_url` as a
+ * URL), `tcp` (a bare connection attempt against `health_url` parsed as
+ * "host:port"), or `dns` (resolves `health_url` as a bare hostname). None
+ * of the latter two have a request/response body or status to grade. See
  * supabase/functions/prober/check.ts's own `CheckType` for the mirrored
  * type on the prober side. */
-export const CHECK_TYPES = ["http", "tcp"] as const;
+export const CHECK_TYPES = ["http", "tcp", "dns"] as const;
 export type CheckType = (typeof CHECK_TYPES)[number];
 
 /**

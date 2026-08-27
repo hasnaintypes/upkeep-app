@@ -188,12 +188,13 @@ export function AddProjectForm({
     // Headers are only validated/submitted here for create. For edit, they
     // go through updateProjectHeaders below instead of this schema/action --
     // see lib/headers.ts for why masked values can't just round-trip here.
-    // Also forced empty for check_type = "tcp" regardless of headerRows'
-    // contents -- a raw TCP check has no HTTP headers to send, and the
-    // editor for them is hidden for tcp (above), but headerRows itself
-    // isn't cleared on a check_type switch, so this is the actual guard.
+    // Also forced empty for a non-http check_type regardless of
+    // headerRows' contents -- a raw tcp/dns check has no HTTP headers to
+    // send, and the editor for them is hidden for those types (above), but
+    // headerRows itself isn't cleared on a check_type switch, so this is
+    // the actual guard.
     const headersForCreate =
-      isEditing || values.check_type === "tcp"
+      isEditing || values.check_type !== "http"
         ? {}
         : Object.fromEntries(
             headerRows
@@ -355,6 +356,7 @@ export function AddProjectForm({
             <SelectContent>
               <SelectItem value="http">HTTP</SelectItem>
               <SelectItem value="tcp">TCP port</SelectItem>
+              <SelectItem value="dns">DNS resolution</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -374,6 +376,24 @@ export function AddProjectForm({
             <FieldDescription>
               Enter as &quot;host:port&quot;. Only whether a TCP connection
               can be opened is checked -- no request is sent.
+            </FieldDescription>
+            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+          </Field>
+        ) : values.check_type === "dns" ? (
+          <Field data-invalid={!!fieldErrors.health_url}>
+            <FieldLabel htmlFor="health_url">Hostname</FieldLabel>
+            <Input
+              id="health_url"
+              type="text"
+              placeholder="example.com"
+              required
+              aria-invalid={!!fieldErrors.health_url}
+              value={values.health_url}
+              onChange={(e) => updateField("health_url", e.target.value)}
+            />
+            <FieldDescription>
+              No scheme or port. Only whether this hostname resolves is
+              checked -- no request is sent.
             </FieldDescription>
             <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
           </Field>
@@ -406,7 +426,7 @@ export function AddProjectForm({
             </AccordionTrigger>
             <AccordionContent>
               <FieldGroup>
-                {values.check_type !== "tcp" && (
+                {values.check_type === "http" && (
                   <Field orientation="responsive">
                     <FieldLabel htmlFor="method">Method</FieldLabel>
                     <Select
@@ -427,7 +447,7 @@ export function AddProjectForm({
                   </Field>
                 )}
 
-                {values.check_type !== "tcp" && values.method !== "GET" && (
+                {values.check_type === "http" && values.method !== "GET" && (
                   <Field data-invalid={!!fieldErrors.body}>
                     <FieldLabel htmlFor="body">Request body</FieldLabel>
                     <Textarea
@@ -446,7 +466,7 @@ export function AddProjectForm({
                   </Field>
                 )}
 
-                {values.check_type !== "tcp" && (
+                {values.check_type === "http" && (
                   <Field
                     orientation="responsive"
                     data-invalid={!!fieldErrors.expected_status}
@@ -566,7 +586,7 @@ export function AddProjectForm({
                   <FieldError errors={toFieldErrorMessages(fieldErrors.tags)} />
                 </Field>
 
-                {values.check_type !== "tcp" && (
+                {values.check_type === "http" && (
                   <HeaderFieldsEditor rows={headerRows} onChange={setHeaderRows} />
                 )}
 
@@ -675,7 +695,7 @@ export function AddProjectForm({
                 <FieldDescription className="-mt-2">
                   Makes this project&apos;s current status, uptime %, and
                   response-time history visible to anyone with the link. The
-                  health check {values.check_type === "tcp" ? "target" : "URL"},
+                  health check {values.check_type === "http" ? "URL" : "target"},
                   custom headers, and any auth tokens are never included.
                 </FieldDescription>
 

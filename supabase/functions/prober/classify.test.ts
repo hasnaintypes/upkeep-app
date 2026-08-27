@@ -8,6 +8,7 @@ import type { CheckResult } from "./check.ts";
 
 const project: ClassifiableProject = { expected_status: 200, check_type: "http" };
 const tcpProject: ClassifiableProject = { expected_status: 200, check_type: "tcp" };
+const dnsProject: ClassifiableProject = { expected_status: 200, check_type: "dns" };
 
 function result(overrides: Partial<CheckResult>): CheckResult {
   return {
@@ -143,6 +144,51 @@ Deno.test("classifyCheck: tcp, timed out -> down", () => {
         response_time_ms: 5000,
       }),
       tcpProject,
+    ),
+    "down",
+  );
+});
+
+// #56: check_type = "dns" -- unlike tcp, keeps the timeout-vs-other-error
+// split (down vs. unknown), per this issue's own task description asking
+// for "the same error-vs-failure distinction the classifier already uses
+// for HTTP checks" -- but skips the HTTP-only http_status/degraded/waking
+// rules, since a bare resolution has no status/body to grade.
+Deno.test("classifyCheck: dns, resolved within timeout -> up, even if slow", () => {
+  assertEquals(
+    classifyCheck(
+      result({ http_status: null, response_time_ms: 9000 }),
+      dnsProject,
+    ),
+    "up",
+  );
+});
+
+Deno.test("classifyCheck: dns, NXDOMAIN-style resolver error (not a timeout) -> unknown, not down", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        timed_out: false,
+        error_message: "proto error: no records found",
+        response_time_ms: 8,
+      }),
+      dnsProject,
+    ),
+    "unknown",
+  );
+});
+
+Deno.test("classifyCheck: dns, timed out -> down, not unknown", () => {
+  assertEquals(
+    classifyCheck(
+      result({
+        http_status: null,
+        timed_out: true,
+        error_message: "Timed out after 5000ms",
+        response_time_ms: 5000,
+      }),
+      dnsProject,
     ),
     "down",
   );

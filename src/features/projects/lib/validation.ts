@@ -77,6 +77,34 @@ export const tcpTargetSchema = z
     }
   });
 
+/** RFC 1123-style hostname: dot-separated labels, each 1-63 chars,
+ * alphanumeric/hyphen, no leading/trailing hyphen per label, 253 chars
+ * total. */
+const HOSTNAME_PATTERN =
+  /^(?=.{1,253}$)(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*$/;
+
+/**
+ * `check_type === "dns"`'s target validation: a bare hostname, no scheme/
+ * port (PRD §5.2, Phase 9, #56). Exported (like healthUrlSchema/
+ * tcpTargetSchema) so createProject/updateProject can re-validate
+ * server-side too. Syntax-only, same reasoning as the other two target
+ * schemas -- whether the hostname actually resolves is exactly what the
+ * prober's own check (supabase/functions/prober/check.ts's runDnsCheck)
+ * determines at check time, not at save time.
+ */
+export const dnsTargetSchema = z
+  .string()
+  .trim()
+  .min(1, "A hostname is required.")
+  .superRefine((value, ctx) => {
+    if (!HOSTNAME_PATTERN.test(value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter a valid hostname (e.g. example.com), no scheme or port.",
+      });
+    }
+  });
+
 const TIME_OF_DAY_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
@@ -124,9 +152,10 @@ export const createProjectSchema = z.object({
     .max(2000, "Description must be 2000 characters or fewer.")
     .optional(),
   // Format depends on check_type -- validated in the object-level
-  // superRefine below (either healthUrlSchema's https:// rule or
-  // tcpTargetSchema's "host:port" rule), not here, so a valid tcp target
-  // isn't rejected by an unconditionally-applied URL check.
+  // superRefine below (healthUrlSchema's https:// rule, tcpTargetSchema's
+  // "host:port" rule, or dnsTargetSchema's bare-hostname rule), not here,
+  // so a valid tcp/dns target isn't rejected by an unconditionally-applied
+  // URL check.
   health_url: z.string().trim().min(1, "A target is required."),
   check_type: z.enum(CHECK_TYPES).optional(),
   method: z.enum(["GET", "POST", "HEAD"]),
@@ -195,7 +224,8 @@ export const createProjectSchema = z.object({
   is_public: z.boolean().optional(),
 }).superRefine((values, ctx) => {
   const checkType = values.check_type ?? "http";
-  const targetValidator = checkType === "tcp" ? tcpTargetSchema : healthUrlSchema;
+  const targetValidator =
+    checkType === "tcp" ? tcpTargetSchema : checkType === "dns" ? dnsTargetSchema : healthUrlSchema;
   const targetResult = targetValidator.safeParse(values.health_url);
   if (!targetResult.success) {
     for (const issue of targetResult.error.issues) {

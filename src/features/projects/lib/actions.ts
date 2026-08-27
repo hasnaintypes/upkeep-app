@@ -3,20 +3,21 @@
 import { createClient } from "@/lib/supabase/server";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 import type { ProjectActionResult } from "../types";
-import { healthUrlSchema, tcpTargetSchema } from "./validation";
+import { dnsTargetSchema, healthUrlSchema, tcpTargetSchema } from "./validation";
 import { type HeaderMap, maskProjectHeaders, mergeHeaders } from "./headers";
 
 /**
  * Re-validates `health_url` server-side against whichever format its
- * `check_type` actually requires (#55) -- `healthUrlSchema`'s https:// rule
- * for `"http"` (the default, and the only option that existed before this
- * issue), `tcpTargetSchema`'s "host:port" rule for `"tcp"`. Shared by both
+ * `check_type` actually requires (#55/#56) -- `healthUrlSchema`'s https://
+ * rule for `"http"` (the default, and the only option that existed before
+ * #55), `tcpTargetSchema`'s "host:port" rule for `"tcp"`, or
+ * `dnsTargetSchema`'s bare-hostname rule for `"dns"`. Shared by both
  * createProject and updateProject below so the two can't drift.
  */
 function validateHealthUrl(checkType: string | undefined, healthUrl: string) {
-  return checkType === "tcp"
-    ? tcpTargetSchema.safeParse(healthUrl)
-    : healthUrlSchema.safeParse(healthUrl);
+  if (checkType === "tcp") return tcpTargetSchema.safeParse(healthUrl);
+  if (checkType === "dns") return dnsTargetSchema.safeParse(healthUrl);
+  return healthUrlSchema.safeParse(healthUrl);
 }
 
 /**

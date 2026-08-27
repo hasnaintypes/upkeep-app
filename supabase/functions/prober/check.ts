@@ -1,5 +1,5 @@
 // Health-check execution (PRD §5.2, Phase 3, issues #21-#22; TCP check
-// type, Phase 9, issue #55).
+// type, Phase 9, issue #55; DNS check type, Phase 9, issue #56).
 //
 // Scope note: this module only fires the check and captures the raw
 // result. It deliberately does NOT do status classification (up/down/
@@ -15,20 +15,20 @@
 // status-classification step should branch on `timed_out` directly rather
 // than string-matching the message (e.g. for "unknown" vs "down").
 //
-// #55's `check_type`: `runHealthCheck` below is a thin dispatcher over two
-// otherwise-independent runners, `runHttpCheck` (the original #21-#22
-// implementation, unchanged) and `runTcpCheck` (new). Both produce the same
-// `CheckResult` shape so classify.ts/retry.ts/persist.ts don't need to know
-// which kind of check produced it -- a TCP result simply always has
-// `http_status: null`/`response_snippet: null` (nothing to grade there),
-// exactly like an HTTP result that never got a response. See classify.ts's
-// own top comment for how `check_type` changes status classification
-// itself (no degraded/waking for a bare TCP check).
+// `check_type`: `runHealthCheck` below is a thin dispatcher over three
+// otherwise-independent runners -- `runHttpCheck` (the original #21-#22
+// implementation, unchanged), `runTcpCheck` (#55), and `runDnsCheck` (#56).
+// All three produce the same `CheckResult` shape so classify.ts/retry.ts/
+// persist.ts don't need to know which kind of check produced it -- a tcp
+// or dns result simply always has `http_status: null`/`response_snippet:
+// null` (nothing to grade there), exactly like an HTTP result that never
+// got a response. See classify.ts's own top comment for how `check_type`
+// changes status classification itself.
 
 /** The subset of a `projects` row this module needs. Kept minimal and
  * local rather than importing the Next.js app's generated Database type --
  * this Edge Function is a separate Deno runtime/module graph. */
-export type CheckType = "http" | "tcp";
+export type CheckType = "http" | "tcp" | "dns";
 
 export type DueProject = {
   id: string;
@@ -262,12 +262,104 @@ async function runTcpCheck(project: DueProject): Promise<CheckResult> {
   }
 }
 
+/**
+ * Resolves `check_type = 'dns'`'s overloaded `health_url` value as a bare
+ * hostname (e.g. "example.com", no scheme/port) and captures whether an
+ * `A` record resolution succeeded within `project.timeout_ms`. Never
+ * throws, same contract as `runHttpCheck`/`runTcpCheck` -- an empty target,
+ * an NXDOMAIN/SERVFAIL-style resolver error, and a timeout are all just
+ * different `error_message`/`timed_out` combinations on a normal
+ * CheckResult, not an exception.
+ *
+ * Only queries `A` (IPv4) records, deliberately -- the overwhelmingly
+ * common case for a project's own health-check hostname, and matches this
+ * feature's "boring, extensible" scope per #56's acceptance criteria
+ * (resolves-or-doesn't, not full record-type/expected-value assertions --
+ * the issue's own task description floats an *optional* expected-IP match
+ * as a stretch goal, but that's not in the acceptance criteria, so it's
+ * deliberately not built here rather than guessed at). An AAAA-only
+ * hostname would be misreported as unresolvable; revisit with an AAAA
+ * fallback if that turns out to matter for a real project.
+ *
+ * `Deno.resolveDns` (like `Deno.connect`) takes no `AbortSignal`/
+ * cancellation token, so the timeout here is enforced with `Promise.race`
+ * against a plain timer, same approach as `runTcpCheck`. Unlike a TCP
+ * connection, a DNS lookup holds no open resource to explicitly close if
+ * it resolves only after the race has already timed out -- the trailing
+ * `.catch` below exists solely to stop a late rejection from surfacing as
+ * an unhandled-rejection warning for a promise nothing else is awaiting.
+ */
+async function runDnsCheck(project: DueProject): Promise<CheckResult> {
+  const startedAt = performance.now();
+  const hostname = project.health_url.trim();
+
+  if (!hostname) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: 0,
+      response_snippet: null,
+      error_message: `Invalid DNS target "${project.health_url}" -- expected a hostname.`,
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+
+  const resolvePromise = Deno.resolveDns(hostname, "A");
+  resolvePromise.catch(() => {
+    // Deliberately swallowed -- see this function's own doc comment.
+  });
+
+  const timeoutPromise = new Promise<"timeout">((resolve) => {
+    setTimeout(() => resolve("timeout"), project.timeout_ms);
+  });
+
+  try {
+    const outcome = await Promise.race([resolvePromise, timeoutPromise]);
+    const responseTimeMs = Math.round(performance.now() - startedAt);
+
+    if (outcome === "timeout") {
+      return {
+        project_id: project.id,
+        http_status: null,
+        response_time_ms: responseTimeMs,
+        response_snippet: null,
+        error_message: `Timed out after ${project.timeout_ms}ms`,
+        timed_out: true,
+        attempts: 1,
+      };
+    }
+
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: responseTimeMs,
+      response_snippet: null,
+      error_message: null,
+      timed_out: false,
+      attempts: 1,
+    };
+  } catch (err) {
+    return {
+      project_id: project.id,
+      http_status: null,
+      response_time_ms: Math.round(performance.now() - startedAt),
+      response_snippet: null,
+      error_message: err instanceof Error ? err.message : "Unknown error",
+      timed_out: false,
+      attempts: 1,
+    };
+  }
+}
+
 /** Dispatches to the runner matching `project.check_type` -- the one thing
  * every other module in this pipeline (retry.ts/classify.ts/persist.ts)
  * calls or reasons about, so neither of them needs its own check_type
  * branch just to fire the request. */
 export function runHealthCheck(project: DueProject): Promise<CheckResult> {
-  return project.check_type === "tcp" ? runTcpCheck(project) : runHttpCheck(project);
+  if (project.check_type === "tcp") return runTcpCheck(project);
+  if (project.check_type === "dns") return runDnsCheck(project);
+  return runHttpCheck(project);
 }
 
 /**
