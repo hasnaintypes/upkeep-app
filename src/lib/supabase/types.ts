@@ -532,6 +532,20 @@ export type Database = {
           uptime_90d: number
         }[]
       }
+      get_public_projects_summary: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          last_checked_at: string
+          last_status: string
+          name: string
+          uptime_24h: number
+          uptime_30d: number
+          uptime_7d: number
+          uptime_90d: number
+        }[]
+      }
       get_user_portfolio_summary: {
         Args: { p_period_hours: number; p_user_id: string }
         Returns: {

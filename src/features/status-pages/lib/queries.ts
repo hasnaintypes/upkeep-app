@@ -1,7 +1,7 @@
 import type { CheckStatus } from "@/features/projects";
 import type { DailyHistoryPoint, ResponseTimeSeries } from "@/features/dashboard";
 import { createClient } from "@/lib/supabase/server";
-import type { PublicProjectStatus } from "../types";
+import type { PublicProjectStatus, PublicProjectSummary } from "../types";
 
 /**
  * Status + rolling uptime % for one opted-in-public project (PRD §5.6,
@@ -36,6 +36,35 @@ export async function getPublicProjectStatus(projectId: string): Promise<{
 
   return {
     data: { ...row, last_status: row.last_status as CheckStatus | null },
+    error: null,
+  };
+}
+
+/**
+ * Every currently-public project's status + 24h/7d/30d/90d uptime %, for the
+ * aggregate portfolio status page (PRD §5.6, Phase 8, #53). Same
+ * unauthenticated-safe reasoning as `getPublicProjectStatus` above --
+ * `get_public_projects_summary` is a `security definer` function that
+ * filters to `is_public = true` itself. Unlike the single-project queries,
+ * an empty result here is a normal, valid state (no public projects yet),
+ * not treated as an error or a 404 by the route layer.
+ */
+export async function getPublicProjectsSummary(): Promise<{
+  data: PublicProjectSummary[];
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_public_projects_summary");
+
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  return {
+    data: (data ?? []).map((row) => ({
+      ...row,
+      last_status: row.last_status as CheckStatus | null,
+    })),
     error: null,
   };
 }
