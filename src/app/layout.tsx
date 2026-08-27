@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { BRAND_NAME } from "@/features/marketing";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -10,8 +11,12 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: {
+    default: BRAND_NAME,
+    template: `%s - ${BRAND_NAME}`,
+  },
+  description:
+    "Self-hosted uptime and health monitoring for personal projects on free-tier hosts.",
 };
 
 const dmSans = DM_Sans({
