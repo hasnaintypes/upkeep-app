@@ -62,15 +62,25 @@ const themedComponents: MDXComponents = {
     <h4 className="mt-6 mb-2 scroll-mt-24 text-base font-semibold text-foreground" {...props} />
   ),
   p: (props) => <p className="my-4 leading-7 text-muted-foreground" {...props} />,
-  a: ({ href = "", className, ...props }) => (
-    <Link
-      href={href}
-      target={isExternalUrl(href) ? "_blank" : undefined}
-      rel={isExternalUrl(href) ? "noreferrer" : undefined}
-      className={cn("font-medium text-foreground underline underline-offset-4", className)}
-      {...props}
-    />
-  ),
+  a: ({ href = "", className, ...props }) => {
+    // Nextra's own Anchor override types `href` as `next/link`'s `Url`
+    // (`string | UrlObject`), since this component can render either a
+    // plain `<a>` or a `<Link>` -- but a real MDX/markdown anchor's `href`
+    // attribute is always a literal string in practice. Narrowed only for
+    // this app's own `isExternalUrl(href: string)` check; the original
+    // (wider-typed) `href` still passes straight through to `<Link>` below
+    // unchanged.
+    const hrefString = typeof href === "string" ? href : "";
+    return (
+      <Link
+        href={href}
+        target={isExternalUrl(hrefString) ? "_blank" : undefined}
+        rel={isExternalUrl(hrefString) ? "noreferrer" : undefined}
+        className={cn("font-medium text-foreground underline underline-offset-4", className)}
+        {...props}
+      />
+    );
+  },
   ul: (props) => <ul className="my-4 ml-6 list-disc space-y-2 text-muted-foreground" {...props} />,
   ol: (props) => (
     <ol className="my-4 ml-6 list-decimal space-y-2 text-muted-foreground" {...props} />

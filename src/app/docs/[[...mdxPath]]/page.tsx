@@ -9,7 +9,13 @@ export async function generateMetadata(props: { params: Promise<{ mdxPath?: stri
   return metadata;
 }
 
-const Wrapper = getMDXComponents().wrapper;
+// Nextra types `wrapper` as optional (`MDXComponents['wrapper']`) since it's
+// meant for a generic MDX consumer that might not define one -- this app's
+// own src/mdx-components.tsx always provides one (the `DocsArticle` page
+// chrome), so the assertion just tells TypeScript what's already true at
+// runtime, same pattern as the `!`-asserted Supabase env vars in
+// src/lib/supabase/*.ts.
+const Wrapper = getMDXComponents().wrapper!;
 
 export default async function Page(props: { params: Promise<{ mdxPath?: string[] }> }) {
   const params = await props.params;
