@@ -5,6 +5,7 @@
 export { OverviewTable } from "./components/overview-table";
 export { StatusBadge } from "./components/status-badge";
 export { AppSidebar } from "./components/app-sidebar";
+export { NavLinkSkeleton } from "./components/nav-main";
 export { NavUser } from "./components/nav-user";
 export { DashboardHeader } from "./components/dashboard-header";
 export { ResponseTimeChart } from "./components/response-time-chart";

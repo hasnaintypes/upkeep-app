@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { getProjects } from "@/features/projects";
 import {
   GlobalIncidentTable,
@@ -60,7 +60,7 @@ async function IncidentsLoader({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       <IncidentFilterBar
         filters={filters}
         projects={projects ?? []}
@@ -75,13 +75,7 @@ async function IncidentsLoader({
 }
 
 function IncidentsSkeleton() {
-  return (
-    <div className="flex flex-col gap-2">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton key={index} className="h-12 w-full" />
-      ))}
-    </div>
-  );
+  return <TableSkeleton columns={6} />;
 }
 
 export default function IncidentsPage({
@@ -90,7 +84,7 @@ export default function IncidentsPage({
   searchParams: Promise<GlobalIncidentSearchParams>;
 }) {
   return (
-    <div className="flex-1 w-full flex flex-col gap-8">
+    <div className="flex flex-1 w-full flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold">Incidents</h1>
         <p className="text-sm text-muted-foreground">

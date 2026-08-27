@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export type NavMainItem = {
   title: string;
@@ -71,6 +72,52 @@ export function NavMain({
               </SidebarMenuItem>
             );
           })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+/**
+ * A single skeleton nav row -- fixed label width, not shadcn's stock
+ * `SidebarMenuSkeleton` (which randomizes its width via `Math.random()` on
+ * every render). That's fine when it only ever renders after client
+ * hydration, but this fallback can end up in a *static* route's prerendered
+ * shell (e.g. /dashboard, which has no dynamic segments), and Next.js
+ * rejects any unstable value like `Math.random()` reachable from a
+ * statically prerendered shell ("blocking prerender" build error).
+ */
+export function NavLinkSkeleton({ width }: { width: string }) {
+  return (
+    <div className="flex h-8 items-center gap-2 rounded-md px-2">
+      <Skeleton className="size-4 shrink-0 rounded-md" />
+      <Skeleton className="h-4 flex-1" style={{ maxWidth: width }} />
+    </div>
+  );
+}
+
+/**
+ * Loading fallback for just the nav links -- `AppSidebar` wraps `<NavMain>`
+ * (not itself) in `<Suspense>` with this, so the sidebar's logo/header and
+ * user footer render immediately and only the link rows show a skeleton,
+ * instead of the whole sidebar going blank the way one outer boundary
+ * around the entire `<AppSidebar>` used to.
+ */
+export function NavMainSkeleton({ itemCount }: { itemCount: number }) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupContent className="flex flex-col gap-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <NavLinkSkeleton width="60%" />
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarMenu>
+          {Array.from({ length: itemCount }).map((_, index) => (
+            <SidebarMenuItem key={index}>
+              <NavLinkSkeleton width={index % 2 === 0 ? "75%" : "55%"} />
+            </SidebarMenuItem>
+          ))}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { AddProjectTrigger, getProjects, ProjectList } from "@/features/projects";
 
 async function ProjectsLoader() {
@@ -28,7 +29,7 @@ async function ProjectsLoader() {
 
 export default function ProjectsPage() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-8">
+    <div className="flex flex-1 w-full flex-col gap-8">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Projects</h1>
@@ -40,11 +41,7 @@ export default function ProjectsPage() {
           <AddProjectTrigger trigger={<Button>Add project</Button>} />
         </Suspense>
       </div>
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">Loading projects...</p>
-        }
-      >
+      <Suspense fallback={<CardGridSkeleton count={6} />}>
         <ProjectsLoader />
       </Suspense>
     </div>

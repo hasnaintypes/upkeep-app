@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SirenIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -61,12 +63,11 @@ export function GlobalIncidentTable({
 
   if (rows.length === 0) {
     return (
-      <Card variant="soft" className="flex flex-col items-center gap-1 p-6 text-center sm:p-10">
-        <p className="text-sm font-medium">No incidents found</p>
-        <p className="text-sm text-muted-foreground">
-          Nothing matches your current filters, or you have no incident history yet.
-        </p>
-      </Card>
+      <EmptyState
+        icon={SirenIcon}
+        title="No incidents found"
+        description="Nothing matches your current filters, or you have no incident history yet."
+      />
     );
   }
 

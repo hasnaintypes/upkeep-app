@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban } from "lucide-react";
+import { Ban, KeyRoundIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -70,18 +71,17 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       <div className="flex justify-end">
         <GenerateApiKeyDialog onCreated={handleCreated} />
       </div>
 
       {keys.length === 0 ? (
-        <Card variant="soft" className="flex flex-col items-center gap-1 p-6 text-center sm:p-10">
-          <p className="text-sm font-medium">No API keys yet</p>
-          <p className="text-sm text-muted-foreground">
-            Generate one to authenticate programmatic project registration.
-          </p>
-        </Card>
+        <EmptyState
+          icon={KeyRoundIcon}
+          title="No API keys yet"
+          description="Generate one to authenticate programmatic project registration."
+        />
       ) : (
         <Card>
           <CardContent className="flex flex-col gap-4 px-4 sm:px-6">

@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Power, PowerOff, RefreshCw, Trash2 } from "lucide-react";
+import { FolderIcon, Pencil, Power, PowerOff, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Card,
   CardContent,
@@ -202,22 +203,23 @@ export function ProjectList({
 
   if (projects.length === 0) {
     return (
-      <Card variant="soft" className="flex flex-col items-center gap-3 p-10 text-center">
-        <CardTitle className="text-base">No projects yet</CardTitle>
-        <CardDescription>
-          Add your first project to start monitoring its health endpoint.
-        </CardDescription>
-        <AddProjectSheet
-          trigger={<Button>Add project</Button>}
-          existingCollections={existingCollections}
-          onSuccess={(created) => setProjects((prev) => [created, ...prev])}
-        />
-      </Card>
+      <EmptyState
+        icon={FolderIcon}
+        title="No projects yet"
+        description="Add your first project to start monitoring its health endpoint."
+        action={
+          <AddProjectSheet
+            trigger={<Button>Add project</Button>}
+            existingCollections={existingCollections}
+            onSuccess={(created) => setProjects((prev) => [created, ...prev])}
+          />
+        }
+      />
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-1 flex-col gap-6">
       {existingCollections.length > 0 && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Collection</span>

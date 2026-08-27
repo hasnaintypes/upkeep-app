@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
+import { FolderIcon, SearchXIcon } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { AddProjectTrigger, getActiveProjects } from "@/features/projects";
 import {
   filterOverviewRows,
@@ -68,15 +69,16 @@ async function OverviewLoader({
 
   if (!projects || projects.length === 0) {
     return (
-      <Card variant="soft" className="flex flex-col items-center gap-3 p-6 text-center sm:p-10">
-        <CardTitle className="text-base">No active projects yet</CardTitle>
-        <CardDescription>
-          Add a project and activate it to see its status here.
-        </CardDescription>
-        <Suspense fallback={<Button disabled>Add project</Button>}>
-          <AddProjectTrigger trigger={<Button>Add project</Button>} />
-        </Suspense>
-      </Card>
+      <EmptyState
+        icon={FolderIcon}
+        title="No active projects yet"
+        description="Add a project and activate it to see its status here."
+        action={
+          <Suspense fallback={<Button disabled>Add project</Button>}>
+            <AddProjectTrigger trigger={<Button>Add project</Button>} />
+          </Suspense>
+        }
+      />
     );
   }
 
@@ -87,7 +89,7 @@ async function OverviewLoader({
   const filteredProjects = filterOverviewRows(projects, summaryByProjectId, filters);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       <OverviewFilterBar
         filters={filters}
         availableTags={availableTags}
@@ -95,15 +97,18 @@ async function OverviewLoader({
         pathname="/dashboard"
       />
       {filteredProjects.length === 0 ? (
-        <Card variant="soft" className="flex flex-col items-center gap-3 p-6 text-center sm:p-10">
-          <CardTitle className="text-base">No projects match your filters</CardTitle>
-          <CardDescription>Try removing a filter or searching for something else.</CardDescription>
-          {hasActiveFilters(filters) && (
-            <Button variant="outline" asChild>
-              <Link href="/dashboard">Clear filters</Link>
-            </Button>
-          )}
-        </Card>
+        <EmptyState
+          icon={SearchXIcon}
+          title="No projects match your filters"
+          description="Try removing a filter or searching for something else."
+          action={
+            hasActiveFilters(filters) ? (
+              <Button variant="outline" asChild>
+                <Link href="/dashboard">Clear filters</Link>
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <OverviewTable projects={filteredProjects} summaries={summaries ?? []} />
       )}
@@ -112,13 +117,7 @@ async function OverviewLoader({
 }
 
 function OverviewSkeleton() {
-  return (
-    <div className="flex flex-col gap-2">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Skeleton key={index} className="h-12 w-full" />
-      ))}
-    </div>
-  );
+  return <TableSkeleton columns={6} />;
 }
 
 export default function DashboardPage({
@@ -127,7 +126,7 @@ export default function DashboardPage({
   searchParams: Promise<OverviewSearchParams>;
 }) {
   return (
-    <div className="flex-1 w-full flex flex-col gap-8">
+    <div className="flex flex-1 w-full flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold">Overview</h1>
         <p className="text-sm text-muted-foreground">

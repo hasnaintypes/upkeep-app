@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import {
   BellIcon,
@@ -20,7 +20,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { BRAND_NAME } from "@/features/marketing";
-import { NavMain, type NavMainItem } from "./nav-main";
+import { NavMain, NavMainSkeleton, type NavMainItem } from "./nav-main";
 
 const NAV_MAIN_ITEMS: NavMainItem[] = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboardIcon },
@@ -73,7 +73,9 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={NAV_MAIN_ITEMS} addProjectSlot={addProjectSlot} />
+        <Suspense fallback={<NavMainSkeleton itemCount={NAV_MAIN_ITEMS.length} />}>
+          <NavMain items={NAV_MAIN_ITEMS} addProjectSlot={addProjectSlot} />
+        </Suspense>
       </SidebarContent>
       <SidebarFooter>{userSlot}</SidebarFooter>
     </Sidebar>

@@ -6,11 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   SidebarInset,
   SidebarMenuButton,
-  SidebarMenuSkeleton,
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { AddProjectTrigger } from "@/features/projects";
-import { AppSidebar, DashboardHeader, NavUser } from "@/features/dashboard";
+import { AppSidebar, DashboardHeader, NavLinkSkeleton, NavUser } from "@/features/dashboard";
 
 /**
  * Fetches the signed-in user's email for the sidebar's `NavUser` footer.
@@ -49,37 +48,41 @@ export default function DashboardLayout({
           route (e.g. /dashboard/projects/[id], #30) that has no
           generateStaticParams -- known static routes like /dashboard don't
           hit it, since Next.js can bake a fixed pathname into their shell
-          at build time. */}
-      <Suspense fallback={<Skeleton className="hidden h-svh w-(--sidebar-width) md:block" />}>
-        <AppSidebar
-          variant="inset"
-          userSlot={
-            <Suspense fallback={null}>
-              <NavUserLoader />
-            </Suspense>
-          }
-          addProjectSlot={
-            <Suspense fallback={<SidebarMenuSkeleton showIcon />}>
-              <AddProjectTrigger
-                trigger={
-                  <SidebarMenuButton
-                    tooltip="Add project"
-                    className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                  >
-                    <PlusCircleIcon />
-                    <span>Add project</span>
-                  </SidebarMenuButton>
-                }
-              />
-            </Suspense>
-          }
-        />
-      </Suspense>
+          at build time. The boundary itself lives *inside* AppSidebar
+          (wrapping just <NavMain>, see app-sidebar.tsx/nav-main.tsx) rather
+          than wrapping the whole component here, so the logo/header and
+          user footer render immediately and only the nav links show a
+          skeleton -- not the entire sidebar. */}
+      <AppSidebar
+        variant="inset"
+        userSlot={
+          <Suspense fallback={null}>
+            <NavUserLoader />
+          </Suspense>
+        }
+        addProjectSlot={
+          <Suspense fallback={<NavLinkSkeleton width="70%" />}>
+            <AddProjectTrigger
+              trigger={
+                <SidebarMenuButton
+                  tooltip="Add project"
+                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                >
+                  <PlusCircleIcon />
+                  <span>Add project</span>
+                </SidebarMenuButton>
+              }
+            />
+          </Suspense>
+        }
+      />
       <SidebarInset>
         <Suspense fallback={<Skeleton className="h-12 w-full" />}>
           <DashboardHeader />
         </Suspense>
-        <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">{children}</div>
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8 lg:px-10 lg:py-10">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

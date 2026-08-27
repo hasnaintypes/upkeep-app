@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { BellIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Card,
   CardContent,
@@ -99,7 +100,7 @@ export function ChannelList({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       <div className="flex justify-end">
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
@@ -129,12 +130,11 @@ export function ChannelList({
       {toggleError && <p className="text-sm text-destructive">{toggleError}</p>}
 
       {channels.length === 0 ? (
-        <Card variant="soft" className="flex flex-col items-center gap-3 p-10 text-center">
-          <CardTitle className="text-base">No notification channels yet</CardTitle>
-          <CardDescription>
-            Add a channel here, then attach it to a project from that project&apos;s page.
-          </CardDescription>
-        </Card>
+        <EmptyState
+          icon={BellIcon}
+          title="No notification channels yet"
+          description="Add a channel here, then attach it to a project from that project's page."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {channels.map((channel) => (

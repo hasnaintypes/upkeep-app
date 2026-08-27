@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
+import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { ChannelList, getNotificationChannels } from "@/features/notifications";
 
 /**
@@ -34,7 +35,7 @@ async function NotificationsLoader() {
 
 export default function NotificationsPage() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-8">
+    <div className="flex flex-1 w-full flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold">Notifications</h1>
         <p className="text-sm text-muted-foreground">
@@ -42,11 +43,7 @@ export default function NotificationsPage() {
           projects.
         </p>
       </div>
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">Loading notification channels...</p>
-        }
-      >
+      <Suspense fallback={<CardGridSkeleton count={3} />}>
         <NotificationsLoader />
       </Suspense>
     </div>
