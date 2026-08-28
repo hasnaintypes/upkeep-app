@@ -5,6 +5,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "setup": "node scripts/setup.mjs",
     "supabase": "supabase",
     "gen:types": "supabase gen types typescript --linked > src/lib/supabase/types.ts"
   },
