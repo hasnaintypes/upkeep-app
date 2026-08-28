@@ -18,6 +18,9 @@ Early development. See [docs/PRD.md](docs/PRD.md) for the full product spec.
 - [Health-check endpoint contract](supabase/functions/prober/HEALTH_CHECK_CONTRACT.md) — exactly
   what your project's health endpoint needs to return to be classified correctly (status codes,
   timeouts, response-time thresholds, and the optional body/JSON/TCP/DNS/SSL check types).
+- [Example health-check endpoints](supabase/functions/prober/HEALTH_CHECK_EXAMPLES.md) — minimal,
+  verified-working health-check snippets for Express, FastAPI, and Next.js, satisfying the
+  contract above as-is.
 - [Outgoing webhook payload contract](supabase/functions/notifier/WEBHOOK_PAYLOAD.md) — the exact
   JSON Upkeep POSTs to a `webhook`-type notification channel on incident open/resolve.
 

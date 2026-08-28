@@ -79,6 +79,10 @@ export async function GET() {
 }
 ```
 
+See [`HEALTH_CHECK_EXAMPLES.md`](./HEALTH_CHECK_EXAMPLES.md) for the same three stacks with a
+verified, copy-pasteable JSON body wired up to this contract's `expected_json_path`/
+`expected_json_value` assertion (below), instead of just a bare status code.
+
 ### What's graded, and in what order
 
 Once a response arrives (or the request fails/times out), it's checked against your project's
