@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  ExternalLink,
   FolderIcon,
   LayoutGridIcon,
   Pencil,
@@ -42,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { notify } from "@/lib/toast";
+import { isExternalUrl } from "@/lib/utils";
 import { AddProjectSheet } from "./add-project-sheet";
 import { ProjectTable } from "./project-table";
 import { deleteProject, setProjectActive } from "../lib/actions";
@@ -108,7 +110,7 @@ export function ProjectList({
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runResults, setRunResults] = useState<Record<string, ManualCheckResult>>({});
   const [runErrors, setRunErrors] = useState<Record<string, string>>({});
-  const [view, setView] = useState<ProjectView>("cards");
+  const [view, setView] = useState<ProjectView>("table");
   const [bulkPending, setBulkPending] = useState(false);
 
   const existingCollections = useMemo(
@@ -389,7 +391,7 @@ export function ProjectList({
           )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groupProjects.map((project) => (
-              <Card key={project.id}>
+              <Card key={project.id} className="gap-4 transition-shadow hover:shadow-md">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-base">
@@ -397,20 +399,40 @@ export function ProjectList({
                         {project.name}
                       </Link>
                     </CardTitle>
-                    <Badge variant={project.is_active ? "default" : "secondary"}>
+                    <Badge variant={project.is_active ? "default" : "secondary"} className="shrink-0">
                       {project.is_active ? "Active" : "Paused"}
                     </Badge>
                   </div>
                   {project.description && (
-                    <CardDescription>{project.description}</CardDescription>
+                    <CardDescription className="line-clamp-2">
+                      {project.description}
+                    </CardDescription>
                   )}
                 </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  <p className="truncate text-sm text-muted-foreground">
-                    {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
-                  </p>
+                <CardContent className="flex flex-col gap-3">
+                  <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                    <span className="shrink-0 text-xs font-medium tracking-wide uppercase">
+                      {checkTargetPrefix(project.check_type, project.method)}
+                    </span>
+                    {isExternalUrl(project.health_url) ? (
+                      <a
+                        href={project.health_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={project.health_url}
+                        className="inline-flex min-w-0 items-center gap-1 truncate hover:text-foreground hover:underline"
+                      >
+                        <span className="truncate">Health URL</span>
+                        <ExternalLink className="size-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="truncate" title={project.health_url}>
+                        {project.health_url}
+                      </span>
+                    )}
+                  </div>
                   {(project.hosting_provider || project.tags?.length) && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {project.hosting_provider && (
                         <Badge variant="outline">{project.hosting_provider}</Badge>
                       )}
@@ -436,7 +458,7 @@ export function ProjectList({
                     </p>
                   )}
                 </CardContent>
-                <CardFooter className="justify-end gap-1">
+                <CardFooter className="justify-end gap-1 border-t">
                   <Button
                     variant="ghost"
                     size="icon"

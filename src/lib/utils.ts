@@ -54,3 +54,21 @@ export function formatRelativeTime(date: Date | string, now: Date = new Date()):
 
   return `${Math.max(1, Math.round(elapsedSeconds / 60))}m ago`;
 }
+
+/**
+ * Formats a full date/time with a fixed, explicit locale (e.g. for a
+ * relative-time span's `title` tooltip) -- a bare `toLocaleString()` uses
+ * the runtime's default locale, which differs between the server process
+ * and a visitor's browser (e.g. "8/25/2026, 6:17 PM" vs
+ * "25/08/2026, 6:17 pm"). In a Client Component that's rendered on the
+ * server and then hydrated, that mismatch trips React's hydration-mismatch
+ * warning even though the two strings represent the same instant -- pinning
+ * the locale here makes the server- and client-rendered strings identical.
+ */
+export function formatDateTime(date: Date | string): string {
+  const value = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value);
+}

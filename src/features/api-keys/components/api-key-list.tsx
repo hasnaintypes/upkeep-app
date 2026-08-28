@@ -24,13 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDateTime } from "@/lib/utils";
 import { notify } from "@/lib/toast";
 import { GenerateApiKeyDialog } from "./generate-api-key-dialog";
 import { revokeApiKey } from "../lib/actions";
 import type { ApiKey } from "../types";
 
 function formatTimestamp(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "Never";
+  return value ? formatDateTime(value) : "Never";
 }
 
 /**

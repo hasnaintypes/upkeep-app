@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
+import { DataTableSkeleton } from "@/components/data-table/data-table-skeleton";
 import { AddProjectTrigger, getProjects, ProjectList } from "@/features/projects";
 
 async function ProjectsLoader() {
@@ -41,7 +41,7 @@ export default function ProjectsPage() {
           <AddProjectTrigger trigger={<Button>Add project</Button>} />
         </Suspense>
       </div>
-      <Suspense fallback={<CardGridSkeleton count={6} />}>
+      <Suspense fallback={<DataTableSkeleton columnCount={7} rowCount={10} />}>
         <ProjectsLoader />
       </Suspense>
     </div>

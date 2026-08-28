@@ -1,16 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pause, Play, Trash2 } from "lucide-react";
+import { Pause, Play, Search, Trash2, X } from "lucide-react";
 import { useTable, type ColumnFiltersState, type ColumnVisibilityState, type SortingState } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/data-table/data-table";
-import { DataTableViewOptions } from "@/components/data-table/data-table-view-options";
+import { DataTableFilter } from "@/components/data-table/data-table-filter";
 import { dataTableFeatures } from "@/components/data-table/features";
 import { createProjectColumns } from "./project-columns";
+import { getAvailableHostingProviders, getAvailableTags } from "../lib/filters";
 import type { ManualCheckResult, Project } from "../types";
+
+const STATUS_OPTIONS = [
+  { label: "Active", value: "active" },
+  { label: "Paused", value: "paused" },
+];
 
 type ProjectTableProps = {
   projects: Project[];
@@ -56,6 +62,9 @@ export function ProjectTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [nameFilter, setNameFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [providerFilter, setProviderFilter] = useState<string[]>([]);
+  const [tagsFilter, setTagsFilter] = useState<string[]>([]);
 
   const columns = useMemo(
     () =>
@@ -83,11 +92,48 @@ export function ProjectTable({
     ],
   );
 
+  const providerOptions = useMemo(
+    () => getAvailableHostingProviders(projects).map((value) => ({ label: value, value })),
+    [projects],
+  );
+  const tagOptions = useMemo(
+    () => getAvailableTags(projects).map((value) => ({ label: value, value })),
+    [projects],
+  );
+
   const filteredProjects = useMemo(() => {
     const query = nameFilter.trim().toLowerCase();
-    if (!query) return projects;
-    return projects.filter((project) => project.name.toLowerCase().includes(query));
-  }, [projects, nameFilter]);
+    return projects.filter((project) => {
+      if (query && !project.name.toLowerCase().includes(query)) return false;
+      if (statusFilter.length > 0) {
+        const status = project.is_active ? "active" : "paused";
+        if (!statusFilter.includes(status)) return false;
+      }
+      if (providerFilter.length > 0) {
+        if (!project.hosting_provider || !providerFilter.includes(project.hosting_provider)) {
+          return false;
+        }
+      }
+      if (tagsFilter.length > 0) {
+        const tags = project.tags ?? [];
+        if (!tagsFilter.some((tag) => tags.includes(tag))) return false;
+      }
+      return true;
+    });
+  }, [projects, nameFilter, statusFilter, providerFilter, tagsFilter]);
+
+  const hasActiveFilters =
+    nameFilter.trim().length > 0 ||
+    statusFilter.length > 0 ||
+    providerFilter.length > 0 ||
+    tagsFilter.length > 0;
+
+  function clearFilters() {
+    setNameFilter("");
+    setStatusFilter([]);
+    setProviderFilter([]);
+    setTagsFilter([]);
+  }
 
   const table = useTable({
     features: dataTableFeatures,
@@ -108,55 +154,82 @@ export function ProjectTable({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Input
-          placeholder="Filter by name..."
-          value={nameFilter}
-          onChange={(event) => setNameFilter(event.target.value)}
-          className="h-8 w-full max-w-64"
-        />
-        <div className="flex items-center gap-2">
-          {selectedProjects.length > 0 && (
-            <>
-              <span className="text-sm text-muted-foreground">
-                {selectedProjects.length} selected
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={bulkPending}
-                onClick={() => {
-                  onBulkSetActive(selectedProjects, true);
-                  table.resetRowSelection();
-                }}
-              >
-                <Play />
-                Resume
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={bulkPending}
-                onClick={() => {
-                  onBulkSetActive(selectedProjects, false);
-                  table.resetRowSelection();
-                }}
-              >
-                <Pause />
-                Pause
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={bulkPending}
-                onClick={() => onRequestDelete(selectedProjects)}
-              >
-                <Trash2 />
-                Delete
-              </Button>
-            </>
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search projects..."
+              value={nameFilter}
+              onChange={(event) => setNameFilter(event.target.value)}
+              className="h-8 pl-8"
+            />
+          </div>
+          <DataTableFilter
+            title="Status"
+            options={STATUS_OPTIONS}
+            selected={statusFilter}
+            onChange={setStatusFilter}
+          />
+          <DataTableFilter
+            title="Hosting provider"
+            options={providerOptions}
+            selected={providerFilter}
+            onChange={setProviderFilter}
+          />
+          <DataTableFilter
+            title="Tags"
+            options={tagOptions}
+            selected={tagsFilter}
+            onChange={setTagsFilter}
+            multiple
+          />
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X />
+              Clear filters
+            </Button>
           )}
-          <DataTableViewOptions table={table} />
         </div>
+        {selectedProjects.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {selectedProjects.length} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkPending}
+              onClick={() => {
+                onBulkSetActive(selectedProjects, true);
+                table.resetRowSelection();
+              }}
+            >
+              <Play />
+              Resume
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkPending}
+              onClick={() => {
+                onBulkSetActive(selectedProjects, false);
+                table.resetRowSelection();
+              }}
+            >
+              <Pause />
+              Pause
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkPending}
+              onClick={() => onRequestDelete(selectedProjects)}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
       <DataTable table={table} columnCount={columns.length} emptyMessage="No projects match your filters." />
     </div>

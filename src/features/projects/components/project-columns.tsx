@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ExternalLink,
   MoreHorizontal,
   Pencil,
   Power,
@@ -21,8 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createDataTableColumnHelper } from "@/components/data-table/features";
-import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatDateTime, formatRelativeTime, isExternalUrl } from "@/lib/utils";
 import { AddProjectSheet } from "./add-project-sheet";
 import { checkTargetPrefix } from "../lib/format";
 import type { ManualCheckResult, Project } from "../types";
@@ -101,21 +101,15 @@ export function createProjectColumns(handlers: ProjectColumnHandlers) {
       enableHiding: false,
     }),
     columnHelper.accessor("name", {
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+      header: "Name",
+      enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex flex-col">
-          <Link
-            href={`/dashboard/projects/${row.original.id}`}
-            className="font-medium hover:underline"
-          >
-            {row.original.name}
-          </Link>
-          {row.original.description && (
-            <span className="truncate text-xs text-muted-foreground">
-              {row.original.description}
-            </span>
-          )}
-        </div>
+        <Link
+          href={`/dashboard/projects/${row.original.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.original.name}
+        </Link>
       ),
       enableHiding: false,
     }),
@@ -124,11 +118,31 @@ export function createProjectColumns(handlers: ProjectColumnHandlers) {
       header: "Target",
       cell: ({ row }) => {
         const project = row.original;
+        const prefix = checkTargetPrefix(project.check_type, project.method);
+        const canLink = isExternalUrl(project.health_url);
         return (
           <div className="flex max-w-72 flex-col gap-1">
-            <span className="truncate text-sm text-muted-foreground">
-              {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
-            </span>
+            <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+              <span className="shrink-0 text-xs font-medium tracking-wide uppercase">
+                {prefix}
+              </span>
+              {canLink ? (
+                <a
+                  href={project.health_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={project.health_url}
+                  className="inline-flex min-w-0 items-center gap-1 truncate hover:text-foreground hover:underline"
+                >
+                  <span className="truncate">Health URL</span>
+                  <ExternalLink className="size-3.5 shrink-0" />
+                </a>
+              ) : (
+                <span className="truncate" title={project.health_url}>
+                  {project.health_url}
+                </span>
+              )}
+            </div>
             {runErrors[project.id] && (
               <span className="text-xs text-destructive">{runErrors[project.id]}</span>
             )}
@@ -147,46 +161,26 @@ export function createProjectColumns(handlers: ProjectColumnHandlers) {
     }),
     columnHelper.accessor("is_active", {
       id: "status",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      header: "Status",
+      enableSorting: false,
       cell: ({ row }) => (
         <Badge variant={row.original.is_active ? "default" : "secondary"}>
           {row.original.is_active ? "Active" : "Paused"}
         </Badge>
       ),
     }),
-    columnHelper.display({
-      id: "tags",
-      header: "Tags",
-      cell: ({ row }) => {
-        const project = row.original;
-        if (!project.hosting_provider && !project.tags?.length) {
-          return <span className="text-muted-foreground">—</span>;
-        }
-        return (
-          <div className="flex flex-wrap gap-1">
-            {project.hosting_provider && (
-              <Badge variant="outline">{project.hosting_provider}</Badge>
-            )}
-            {project.tags?.map((tag) => (
-              <Badge key={tag} variant="outline">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        );
-      },
-      enableSorting: false,
-    }),
     columnHelper.accessor("collection", {
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Collection" />,
+      header: "Collection",
+      enableSorting: false,
       cell: ({ row }) => row.original.collection || <span className="text-muted-foreground">—</span>,
     }),
     columnHelper.accessor("created_at", {
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Added" />,
+      header: "Added",
+      enableSorting: false,
       cell: ({ row }) => (
         <span
           className="text-muted-foreground"
-          title={new Date(row.original.created_at).toLocaleString()}
+          title={formatDateTime(row.original.created_at)}
         >
           {formatRelativeTime(row.original.created_at)}
         </span>
