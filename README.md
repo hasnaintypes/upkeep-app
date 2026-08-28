@@ -23,6 +23,9 @@ Early development. See [docs/PRD.md](docs/PRD.md) for the full product spec.
   contract above as-is.
 - [Outgoing webhook payload contract](supabase/functions/notifier/WEBHOOK_PAYLOAD.md) — the exact
   JSON Upkeep POSTs to a `webhook`-type notification channel on incident open/resolve.
+- [Adding a notification channel](supabase/functions/notifier/ADDING_A_CHANNEL.md) — for
+  contributors: exactly what adding a new channel type (Slack, SMS, etc.) touches, verified by
+  actually doing it as a proof-of-concept.
 
 ## Self-hosting
 
