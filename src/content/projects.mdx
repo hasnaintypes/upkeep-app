@@ -5,9 +5,29 @@ description: What each project field controls, and how a check is classified.
 
 # Projects & Health Checks
 
-A project is one thing Upkeep monitors: a name, a health-check URL, and how
-often to check it. Add one from the dashboard's **Add project** button, or
-import several at once from the same sheet.
+A project is one thing Upkeep monitors: a name, a health-check target, and
+how often to check it. Add one from the dashboard's **Add project** button,
+or import several at once from the same sheet.
+
+## Check types
+
+Every project has a `check_type` that determines what the target field
+means and what "success" looks like. Switching the check type in the form
+changes which other fields are shown.
+
+| Check type | Target format | What's verified |
+| --- | --- | --- |
+| `http` (default) | Full URL, e.g. `https://your-app.example.com/health` | An HTTP request is made and graded (status, optional body/JSON assertion, response time). |
+| `tcp` | `host:port`, e.g. `db.example.com:5432` | A raw TCP connection can be opened -- no request is sent, no data read. |
+| `dns` | Bare hostname, e.g. `example.com` | The hostname resolves to an `A` (IPv4) record. |
+| `ssl` | `host:port`, e.g. `example.com:443` | The server's TLS certificate is valid and not expiring within 14 days -- no request is sent. |
+
+Every check type shares the same timeout and the same five-way outcome
+vocabulary (up/down/degraded/waking/unknown), but not every outcome is
+reachable by every type -- see
+[the health-check contract](https://github.com/hasnaintypes/upkeep-app/blob/master/supabase/functions/prober/HEALTH_CHECK_CONTRACT.md)
+for the exact per-type breakdown (e.g. a TCP check is only ever up/down,
+never degraded).
 
 ## Fields
 
@@ -15,30 +35,52 @@ import several at once from the same sheet.
 | --- | --- |
 | Name | Display name shown across the dashboard. |
 | Description | Optional free text. |
-| Health check URL | Must be `https://` (or `http://localhost` while developing). This is what gets pinged. |
-| Method | `GET`, `POST`, or `HEAD`. |
-| Request body | Sent with non-`GET` requests, e.g. `{"ping": true}`. |
-| Expected status | HTTP status code (100-599) that counts as "up". |
+| Check type | `http`, `tcp`, `dns`, or `ssl` -- see above. |
+| Health check target | The URL/host:port/hostname the check type above expects. Must be reachable from the public internet (`http://localhost` only works while developing). |
+| Method | HTTP checks only -- `GET`, `POST`, or `HEAD`. |
+| Request body | HTTP checks only, sent with `POST`, e.g. `{"ping": true}`. |
+| Expected status | HTTP checks only -- status code (100-599) that counts as "up". |
 | Check interval | How often to check, from every 30 seconds up to once a day. |
 | Timeout | How long to wait before a check counts as failed (1-120 seconds). |
 | Hosting provider | Optional label (Render, Railway, Vercel, ...). |
 | Collection | Optional grouping ("folder") -- projects without one show under Uncategorized. |
 | Tags | Optional, comma-separated. |
-| Custom headers | Optional bearer tokens / headers sent with each check, added after creating the project. |
+| Custom headers | HTTP checks only -- optional bearer tokens / headers sent with each check, added after creating the project. |
+| Keep-alive | HTTP checks only -- pings every 10 minutes purely to prevent idle spin-down, optionally restricted to a daily time window. Never writes a check result or opens/resolves an incident. See [below](#keep-alive-pings). |
+| Public status page | Opts this project into an unauthenticated `/status/[id]` page. See [Public Status Pages](/docs/status-pages). |
+
+<Callout type="note">
+  A few fields exist in the database but don't have UI yet: `retry_count`,
+  and the keyword/JSON-path body assertions (`expected_body_match`,
+  `expected_json_path`/`expected_json_value`). Every project currently runs
+  with the default retry count and no body assertion until that UI ships --
+  see the health-check contract linked above for what they'll do once
+  configurable.
+</Callout>
+
+## Keep-alive pings
+
+Separate from monitoring entirely: if enabled, Upkeep pings the project's
+target every 10 minutes, optionally restricted to a daily time window (in a
+timezone you choose) so it isn't always-on. A keep-alive ping reuses the
+project's method/headers/body/timeout but is graded on nothing -- it never
+writes a check row and can never itself open or resolve an incident,
+regardless of whether it succeeds. Only available for `http`-type projects.
 
 ## Bulk import
 
 The **Add project** sheet has an import section above the single-project
 form: upload a `.csv` or `.json` file to create several projects at once.
 
-- **Required columns/keys:** `name`, `health_url`.
-- **Optional:** `description`, `method`, `expected_status`,
-  `check_interval_seconds`, `timeout_ms`, `hosting_provider`, `collection`,
-  `tags`.
+- **Required columns/keys:** `name`, `health_url` (the check target -- format
+  depends on `check_type`, see [Check types](#check-types) above).
+- **Optional:** `description`, `check_type` (`http` if omitted), `method`,
+  `expected_status`, `check_interval_seconds`, `timeout_ms`,
+  `hosting_provider`, `collection`, `tags`.
 - In CSV, separate multiple `tags` with `;` (not `,`, since that's the CSV
   delimiter).
-- Custom headers / bearer tokens aren't supported via import -- add those
-  individually after creating a project.
+- Custom headers / bearer tokens, and keep-alive settings, aren't supported
+  via import -- add those individually after creating a project.
 
 Each row is created independently and reported with its own success/failure,
 so one bad row doesn't block the rest.
@@ -49,9 +91,30 @@ Each check comes back as one of:
 
 - **up** -- responded with the expected status within the timeout.
 - **down** -- didn't respond, timed out, or returned an unexpected status.
-- **degraded** -- responded, but slowly or with a borderline result.
-- **waking** -- consistent with a free-tier host spinning up from idle.
-- **unknown** -- the check itself couldn't run.
+- **degraded** -- responded, but slowly or with a borderline result (HTTP:
+  response time over 3s; SSL: certificate expiring within 14 days).
+- **waking** -- an HTTP check responded successfully but slowly (over 7s),
+  consistent with a free-tier host spinning up from idle. Only HTTP checks
+  can produce this status.
+- **unknown** -- the check itself couldn't run (e.g. DNS failure or
+  connection refused before any response, or a DNS resolver error).
 
 A project going from up to down opens an incident (see
 [Notifications](/docs/notifications) for how that's escalated and alerted).
+
+## Multi-region probing
+
+If your Upkeep instance has multi-region probing enabled, every check fires
+concurrently from three fixed regions rather than one. The overall result
+only becomes `down` if more than half of the regions that actually
+responded report `down` -- a single region's blip doesn't take a project
+down on its own. This isn't configurable per project.
+
+## Rate-limit backoff
+
+A `429` response is still classified as `down`, but Upkeep automatically
+slows its own polling in response: each consecutive `429` doubles the wait
+before the next attempt (starting from the project's own check interval,
+capped at one hour), resetting the moment a check comes back without a
+`429`. The project detail page shows a notice while a project is backed
+off.

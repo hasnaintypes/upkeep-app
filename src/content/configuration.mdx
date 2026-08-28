@@ -29,8 +29,22 @@ working on marketing/UI changes without a Supabase project configured.
 
 | Variable | Purpose |
 | --- | --- |
-| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS for trusted server-side code, e.g. programmatic project registration via a per-user API key. |
-| `SUPABASE_SECRET_KEY` | Invokes deployed Edge Functions that require `auth: "secret"` (the prober's manual "run check now" path, and scheduled triggers). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS for trusted server-side code, e.g. `POST /api/projects/register` (see [API Keys](/docs/api-keys)). |
+| `SUPABASE_SECRET_KEY` | Invokes deployed Edge Functions that require `auth: "secret"` (the "run check now" Server Action, and manual testing). The same value also seeds the `prober_secret_key` vault secret the scheduled cron jobs authenticate with -- see [Getting Started](/docs/getting-started). |
+
+## Edge Function secrets
+
+Separate from the `.env` variables above: `RESEND_API_KEY` (and the
+optional `RESEND_FROM_ADDRESS` override) are Edge Function secrets, only
+needed for the email notification channel, set via the Supabase CLI --
+never as `.env` values, never committed:
+
+```bash
+pnpm supabase secrets set RESEND_API_KEY=<your resend api key>
+```
+
+Until `RESEND_API_KEY` is set, an email channel simply fails gracefully
+(logged, not thrown) on every dispatch attempt.
 
 ## Database schema
 

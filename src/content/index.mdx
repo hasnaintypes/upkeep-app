@@ -21,8 +21,13 @@ one dashboard instead of N different host dashboards to check.
 
 ## What it does
 
-- **Health checks** -- periodically requests each project's health endpoint
-  and classifies the result (up, down, degraded, waking, unknown).
+- **Health checks** -- periodically checks each project using one of four
+  check types (HTTP, TCP, DNS, SSL certificate) and classifies the result
+  (up, down, degraded, waking, unknown). See
+  [Projects & Health Checks](/docs/projects) for what each type verifies.
+- **Keep-alive pings** -- optionally pings a project every 10 minutes
+  (with an optional daily active window) purely to stop a free-tier host
+  idling out -- separate from monitoring and never opens an incident.
 - **Incidents** -- opens an incident when a project goes down, tracks how
   long it stays down, and resolves it automatically once checks recover.
 - **Notifications** -- alerts a Discord webhook, email, or generic webhook
@@ -30,9 +35,15 @@ one dashboard instead of N different host dashboards to check.
   and optional daily/weekly digests instead of per-incident noise.
 - **Dashboard** -- response-time graphs, uptime heatmaps, and a searchable
   incident history across every project you own.
+- **Public status pages** -- opt any project into an unauthenticated,
+  read-only status page, plus one aggregate portfolio page listing every
+  project you've made public. See [Public Status Pages](/docs/status-pages).
+- **Programmatic registration** -- register a project from a CI/CD deploy
+  step using a per-user API key instead of the dashboard form. See
+  [API Keys](/docs/api-keys).
 
 ## Stack
 
-Upkeep's backend is Supabase (Postgres, Edge Functions, scheduled triggers)
-and its frontend is a Next.js dashboard, deployable independently of the
-backend on Vercel, Netlify, or similar.
+Upkeep's backend is Supabase (Postgres, Edge Functions, `pg_cron` scheduled
+triggers) and its frontend is a Next.js dashboard, deployable independently
+of the backend on Vercel, Netlify, or similar.

@@ -1,0 +1,57 @@
+---
+title: API Keys
+description: Programmatic project registration from a deploy step.
+---
+
+# API Keys
+
+API keys let a project self-register its health check at deploy time
+instead of adding it through the dashboard form -- e.g. call the
+registration endpoint from a CI/CD deploy step so a new service starts
+being monitored the moment it ships.
+
+## Generating a key
+
+From **/dashboard/api-keys**, click **Generate key** and give it a label
+(e.g. "CI deploy step") to tell it apart later -- the label isn't shown to
+anyone but you.
+
+<Callout type="warning" title="Shown once">
+  The full key is only ever displayed immediately after generation. Copy it
+  somewhere safe -- if you lose it, generate a new one; there's no way to
+  view an existing key's value again.
+</Callout>
+
+Keys can be revoked from the same page. Revoking is permanent -- there's no
+way to un-revoke a key, only generate a new one.
+
+## Registering a project
+
+```
+POST /api/projects/register
+Authorization: Bearer <your-api-key>
+Content-Type: application/json
+```
+
+The request body accepts the same fields as the dashboard's **Add project**
+form (see [Projects & Health Checks](/docs/projects) for what each one
+means) -- `name` and `health_url` are required, everything else is
+optional and takes its usual default.
+
+```bash
+curl -X POST https://your-upkeep-instance.example.com/api/projects/register \
+  -H "Authorization: Bearer upk_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My API",
+    "health_url": "https://my-api.example.com/health",
+    "check_interval_seconds": 300
+  }'
+```
+
+A successful call returns `201` with the created project. An invalid or
+missing key returns `401`; a validation error (e.g. a non-`https://`
+`health_url`) returns `400` with a message naming the offending field.
+
+Every project registered with a given key is created under that key's
+owning user's account -- there's no separate "service account" concept.

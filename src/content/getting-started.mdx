@@ -57,10 +57,53 @@ than a global install):
 pnpm supabase login
 pnpm supabase link --project-ref <your-project-ref>
 pnpm supabase db push
+pnpm gen:types    # regenerate src/lib/supabase/types.ts from the live schema
 ```
 
-## 4. Create an account and add a project
+<Callout type="tip" title="Guided setup wizard">
+  `pnpm setup` (`scripts/setup.mjs`) walks through steps 1, 3, and 4 for you
+  -- env vars, project link, schema, Edge Function deploys, and cron
+  secrets -- and is safe to re-run if it's interrupted partway through.
+</Callout>
+
+## 4. Deploy the Edge Functions and authenticate the cron jobs
+
+Health checks, notifications, digests, and data retention all run as
+Supabase Edge Functions on a `pg_cron` schedule -- without this step, the
+dashboard works but nothing is ever actually checked:
+
+```bash
+pnpm supabase functions deploy prober --use-api
+pnpm supabase functions deploy notifier --use-api
+pnpm supabase functions deploy digest --use-api
+pnpm supabase functions deploy rollup --use-api
+pnpm supabase functions deploy prune --use-api
+```
+
+Each function's schedule is already committed as a migration, but the
+secret each one authenticates with can't be committed -- create it once
+after `db push`:
+
+```bash
+pnpm supabase db query --linked "select vault.create_secret('https://<your-project-ref>.supabase.co', 'project_url');"
+pnpm supabase db query --linked "select vault.create_secret('<your SUPABASE_SECRET_KEY value>', 'prober_secret_key');"
+```
+
+<Callout type="warning" title="Missing this step fails silently">
+  Until both secrets exist, every cron job fires on schedule but fails
+  harmlessly (visible via
+  `select * from cron.job_run_details order by start_time desc limit 5;`)
+  -- no projects get checked and no notifications get sent, with no error
+  surfaced in the dashboard.
+</Callout>
+
+See [README.md](https://github.com/hasnaintypes/upkeep-app#self-hosting) for
+what each function does and optional email (Resend) setup.
+
+## 5. Create an account and add a project
 
 Sign up from the deployed app, then add your first project from the
-dashboard: a name, a health-check URL, and how often to check it. See
+dashboard: a name, a health-check target, and how often to check it. See
 [Projects & Health Checks](/docs/projects) for every field's meaning.
+Either wait up to a minute for the next `prober` tick, or open the project
+and click **Run check now** for an immediate result.

@@ -22,6 +22,14 @@ A channel's type can't be changed after creation -- delete and re-add it
 instead. Its config value is masked once saved and can only be replaced, not
 viewed again.
 
+A webhook channel receives exactly two POSTs per incident (open, then
+resolve) -- never one per check. See the
+[webhook payload contract](https://github.com/hasnaintypes/upkeep-app/blob/master/supabase/functions/notifier/WEBHOOK_PAYLOAD.md)
+for the exact JSON shape if you're wiring up your own receiver. Email
+delivery requires a `RESEND_API_KEY` Edge Function secret -- see
+[Configuration](/docs/configuration) -- and fails gracefully (logged, not
+thrown) per attempt until that's set.
+
 ## Attaching a channel to a project
 
 From a project's detail page, attach any existing channel and set:
@@ -43,6 +51,8 @@ instead of immediate alerts.
 
 <Callout type="note">
   Digest delivery runs on its own schedule, independent of the per-project
-  check interval -- a daily digest goes out once a day regardless of how
-  often each project is individually checked.
+  check interval -- a daily digest fires at 08:00 UTC and a weekly digest
+  fires Mondays at 08:00 UTC, regardless of how often each project is
+  individually checked. Its content is your whole portfolio's status, not
+  just the projects attached to the digest-only rule.
 </Callout>

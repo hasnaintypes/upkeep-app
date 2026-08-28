@@ -1,0 +1,42 @@
+---
+title: Public Status Pages
+description: Opt a project into an unauthenticated, shareable status page.
+---
+
+# Public Status Pages
+
+Any project can be opted into an unauthenticated, read-only status page --
+useful for linking a project's live status from a resume or portfolio site
+without giving visitors access to your dashboard.
+
+## Enabling a project's status page
+
+Open the project's detail page and toggle **Public status page** in its
+settings. A shareable link to `/status/<project-id>` appears once enabled.
+
+<Callout type="note" title="Opt-in, off by default">
+  `is_public` defaults to off for every project -- a health-check target,
+  response times, and failure history aren't something that should be
+  exposed without an explicit choice. Only the fields listed below are ever
+  shown publicly; the check target, headers, and hosting provider never
+  are.
+</Callout>
+
+A project's own public page shows:
+
+- Its name, description, and current status badge.
+- Rolling uptime percentage over 24h/7d/30d/90d.
+- A response-time chart over the last 24 hours.
+- A per-day uptime heatmap.
+
+Disabling the toggle immediately makes the page 404 for anyone without
+dashboard access -- there's no cached/stale public view left behind.
+
+## Portfolio status page
+
+**/status** lists every project you've made public in one place, each
+linking to its own page above -- the "one link for my whole portfolio"
+case. It's not scoped per user; it lists every publicly opted-in project on
+this Upkeep instance, matching this project's current single-owner design.
+An instance with no public projects yet just shows an empty state, not an
+error.

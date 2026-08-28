@@ -38,3 +38,29 @@ imported, just flagged with a warning rather than blocked.
 If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` aren't
 set, auth is silently disabled rather than erroring -- see
 [Configuration](/docs/configuration).
+
+## No project is ever checked, even though everything looks configured
+
+The dashboard and database can be fully set up while the actual checking
+still does nothing, if the `pg_cron` jobs are missing their auth secrets.
+Confirm both vault secrets exist (`project_url` and `prober_secret_key`,
+see [Getting Started](/docs/getting-started)) and that all five Edge
+Functions (`prober`, `notifier`, `digest`, `rollup`, `prune`) are actually
+deployed. Cron jobs fail silently without these -- check
+`select * from cron.job_run_details order by start_time desc limit 5;`
+against your Supabase project for the real error.
+
+## A TCP/DNS/SSL check always shows "unknown" or "down"
+
+Confirm the target's format matches its check type -- `tcp`/`ssl` expect
+`host:port` (no scheme), `dns` expects a bare hostname (no scheme or port).
+A DNS check only resolves `A` (IPv4) records, so an `AAAA`-only hostname
+will always misreport as unresolvable. See
+[Check types](/docs/projects#check-types) for the full table.
+
+## My project's status page is 404ing
+
+The public status page toggle is per-project and off by default -- confirm
+it's enabled in that project's settings (see
+[Public Status Pages](/docs/status-pages)). Disabling it makes the page
+404 immediately, even if you have the link bookmarked.
