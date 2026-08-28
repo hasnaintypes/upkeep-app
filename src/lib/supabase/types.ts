@@ -588,6 +588,7 @@ export type Database = {
         Returns: boolean
       }
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
+      prune_raw_checks: { Args: { p_retention_days?: number }; Returns: number }
       record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
       rollup_daily_checks: { Args: { p_period_start: string }; Returns: number }
