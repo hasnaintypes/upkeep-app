@@ -248,3 +248,12 @@ pnpm build
 
 Run `pnpm lint` before `pnpm build`, or delete `.next/` first — a stale build directory gets linted
 too and floods the output with unrelated errors from bundled JS.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions, commit message style, and how to
+open an issue or PR.
+
+## License
+
+[MIT](LICENSE)

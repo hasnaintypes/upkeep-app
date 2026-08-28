@@ -78,7 +78,7 @@ create extension if not exists pg_net;
 
 -- The actual secret values are deliberately NOT in this migration (never commit secrets to git).
 -- Before this job can succeed, run once, per docs/ROADMAP.md / README.md's prober setup section:
---   select vault.create_secret('https://bcidrdatrrhkicszuoeb.supabase.co', 'project_url');
+--   select vault.create_secret('https://<your-project-ref>.supabase.co', 'project_url');
 --   select vault.create_secret('<your SUPABASE_SECRET_KEY value>', 'prober_secret_key');
 -- (matches Supabase's own documented pattern: https://supabase.com/docs/guides/functions/schedule-functions)
 select cron.schedule(
