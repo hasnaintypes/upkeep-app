@@ -26,6 +26,9 @@ Early development. See [docs/PRD.md](docs/PRD.md) for the full product spec.
 - [Adding a notification channel](supabase/functions/notifier/ADDING_A_CHANNEL.md) — for
   contributors: exactly what adding a new channel type (Slack, SMS, etc.) touches, verified by
   actually doing it as a proof-of-concept.
+- [Adding a check type](supabase/functions/prober/ADDING_A_CHECK_TYPE.md) — for contributors: the
+  same audit applied to check types (e.g. WebSocket, ping), including the plugin-architecture
+  refactor this required.
 
 ## Self-hosting
 

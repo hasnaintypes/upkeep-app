@@ -2,41 +2,22 @@
 // "retry once ... with a short delay before marking a project down, to
 // avoid false positives from cold starts or transient network blips").
 //
-// Scope note: "success" here is a narrow, retry-only judgment (no error, and
-// http_status matches the project's expected_status) -- just enough to
-// decide "should I retry this attempt". It is NOT the full up/down/degraded/
-// waking/unknown status classification (a separate, later Phase 3 task),
-// which also weighs response time, (#58) `expected_body_match`, and (#59)
-// `expected_json_path`/`expected_json_value`.
+// Scope note: "success" here is a narrow, retry-only judgment delegated to
+// the matching check type's own `isAttemptSuccessful` (see check-types.ts's
+// `CHECK_TYPES` registry) -- just enough to decide "should I retry this
+// attempt". It is NOT the full up/down/degraded/waking/unknown status
+// classification (see classify.ts), which also weighs response time and
+// (http-only) #58/#59's body/JSON assertions.
 //
-// #58 keyword/content match: deliberately still excluded from
-// `isAttemptSuccessful` below, per this scope note above -- a
-// status-matching-but-wrong-body response counts as a "successful attempt"
-// for retry purposes (no retry triggered), and classify.ts alone decides
-// it's actually `down`. Reconsider only if a real project shows this
-// causing false-down reports from a genuinely transient body blip that a
-// retry would have smoothed over -- not speculatively widened here.
-//
-// #59 JSON path/value assertion: same exclusion, same reasoning --
-// `runHttpCheck` never sets this function's `result.error_message` for a
-// failed assertion (only the separate `jsonAssertionFailed`/
-// `jsonAssertionError` fields, see check.ts), so a status-matching-but-
-// failed-assertion response already counts as "successful" here without
-// any extra code, consistent with #58's own precedent.
-//
-// #55/#56/#57 (TCP/DNS/SSL check types): none of the three has an
-// `http_status` to compare against `expected_status` (always null, see
-// check.ts's runTcpCheck/runDnsCheck/runSslCheck) -- "success" for retry
-// purposes is just "no error_message" for all three, mirroring
-// classify.ts's own check_type branches for the same reason (even though
-// classify.ts's dns/ssl branches, unlike tcp's, still distinguish
-// timeout/expiring-soon from other outcomes for their own down/unknown/
-// degraded splits -- none of that matters here, a retry only cares
-// whether the attempt succeeded at all. A "degraded" ssl result --
-// connected fine, cert just expiring soon -- correctly counts as success
-// here too: retrying wouldn't change whether the cert is expiring, so
-// there's nothing to retry).
+// Before #70's plugin-architecture audit/refactor, the private
+// `isAttemptSuccessful` below was itself an `if`/`else` chain branching on
+// `check_type` (tcp/dns/ssl sharing one branch, http another). Adding a
+// fifth check type meant editing this function (plus check.ts's and
+// classify.ts's own matching chains). Now it's a plain object-key lookup
+// -- see ADDING_A_CHECK_TYPE.md for the exact steps a new check type
+// needs; this file requires none of them.
 import { runHealthCheck, type CheckResult, type DueProject } from "./check.ts";
+import { CHECK_TYPES } from "./check-types.ts";
 
 /** PRD: "a short delay" -- deliberately not exponential backoff, which
  * wasn't asked for and would make retry timing harder to reason about for
@@ -48,12 +29,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Whether one attempt counts as successful for retry-decision purposes. */
+/** Whether one attempt counts as successful for retry-decision purposes --
+ * delegates to the matching check type's own `isAttemptSuccessful`. */
 function isAttemptSuccessful(result: CheckResult, project: DueProject): boolean {
-  if (project.check_type === "tcp" || project.check_type === "dns" || project.check_type === "ssl") {
-    return result.error_message === null;
-  }
-  return result.error_message === null && result.http_status === project.expected_status;
+  return CHECK_TYPES[project.check_type].isAttemptSuccessful(result, project);
 }
 
 /**
