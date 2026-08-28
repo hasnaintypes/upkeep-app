@@ -590,6 +590,11 @@ export type Database = {
       is_valid_timezone: { Args: { tz: string }; Returns: boolean }
       record_prober_success: { Args: never; Returns: undefined }
       release_prober_lock: { Args: never; Returns: undefined }
+      rollup_daily_checks: { Args: { p_period_start: string }; Returns: number }
+      rollup_hourly_checks: {
+        Args: { p_period_start: string }
+        Returns: number
+      }
       try_acquire_prober_lock: {
         Args: { stale_after_seconds?: number }
         Returns: boolean
