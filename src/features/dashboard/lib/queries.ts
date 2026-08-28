@@ -101,10 +101,18 @@ export async function getResponseTimeSeries(
     };
   }
 
+  // `period_type = 'daily'` is not optional here (#65) -- #62's rollup job
+  // never deletes/consolidates the 24 hourly rows a day's checks started
+  // out as once that day's own daily row is written (only raw `checks`
+  // rows ever get pruned, #63); without this filter a mature 30d/90d
+  // window would return both the 24 hourly rows *and* the 1 daily row for
+  // every settled day (up to ~25x too many points), defeating the
+  // intended one-point-per-day granularity this branch exists for.
   const { data, error } = await supabase
     .from("checks_aggregated")
     .select("period_start, avg_response_time_ms, total_checks, total_failures")
     .eq("project_id", projectId)
+    .eq("period_type", "daily")
     .gte("period_start", since)
     .order("period_start", { ascending: true });
 
