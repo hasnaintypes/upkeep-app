@@ -237,6 +237,42 @@ export async function getProjectChecksPage(
   };
 }
 
+/** Safety cap on rows a single export request can return (PRD §5.3, Phase
+ * 10, #64) -- generous relative to the 7-day raw retention window (#63) at
+ * any real check interval (even a 60s interval across every region a
+ * multi-region-probing project fans out to stays well under this), but
+ * present so one export request can't pull an unbounded number of rows if
+ * pruning has ever fallen behind. */
+const CHECK_EXPORT_ROW_LIMIT = 20000;
+
+/**
+ * Every raw check for one project, newest-first, for the CSV/JSON export
+ * action (#64) -- same RLS-scoped `createClient()`/`checks_select_own`
+ * reliance as `getProjectChecksPage` (no manual ownership filter needed),
+ * just unbounded up to `CHECK_EXPORT_ROW_LIMIT` instead of one page at a
+ * time, since the point of exporting is the full history a user currently
+ * has, not one page of it -- same column set as the check log table shows,
+ * so an export always matches what's on screen for the same project.
+ */
+export async function getProjectChecksForExport(
+  projectId: string,
+): Promise<{ data: CheckLogRow[] | null; error: string | null }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("checks")
+    .select(CHECK_LOG_COLUMNS)
+    .eq("project_id", projectId)
+    .order("checked_at", { ascending: false })
+    .limit(CHECK_EXPORT_ROW_LIMIT);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return { data: data as CheckLogRow[], error: null };
+}
+
 const INCIDENT_COLUMNS = "id, project_id, started_at, resolved_at, cause, notified";
 
 /**

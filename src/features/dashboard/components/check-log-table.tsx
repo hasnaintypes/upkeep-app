@@ -1,8 +1,9 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -35,6 +36,14 @@ function pageHref(projectId: string, checkedAt: string, direction: "next" | "pre
  * Raw check log table for the per-project detail page (PRD §5.6, Phase 4,
  * #32): newest-first, keyset-paginated (see `getProjectChecksPage`).
  *
+ * The header's CSV/JSON export links (PRD §5.3, Phase 10, #64) hit a
+ * separate Route Handler (`/api/projects/[id]/checks/export`), not this
+ * page's own paginated data -- an export is the *full* history, not just
+ * whatever page happens to be showing, and a plain `<a href download>` is
+ * enough to trigger a same-origin cookie-authenticated file download with
+ * zero client JS, consistent with this table otherwise being a plain
+ * Server Component.
+ *
  * `response_snippet` is never rendered inline -- per the issue's
  * acceptance criteria, it's truncated failure-only data, not something
  * every row needs displayed. A row with one (only ever non-null on a
@@ -55,6 +64,20 @@ export function CheckLogTable({
     <Card>
       <CardHeader className="px-4 sm:px-6">
         <CardTitle>Check log</CardTitle>
+        <CardAction className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/api/projects/${projectId}/checks/export?format=csv`} download>
+              <Download />
+              CSV
+            </a>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/api/projects/${projectId}/checks/export?format=json`} download>
+              <Download />
+              JSON
+            </a>
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 px-4 sm:px-6">
         {page.rows.length === 0 ? (
