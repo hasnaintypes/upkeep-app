@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Globe, Plug, Route, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -145,6 +146,22 @@ function healthTargetConfig(checkType: FormState["check_type"]): {
       };
   }
 }
+
+/** Icon + short label for each check type's tile in the visual picker below
+ * -- a monitoring method is the one choice that shapes everything else on
+ * this form (which target field, which advanced fields apply), so it gets
+ * a real visual presence instead of being buried as the first option in a
+ * generic dropdown. */
+const CHECK_TYPE_OPTIONS: {
+  value: "http" | "tcp" | "dns" | "ssl";
+  label: string;
+  icon: typeof Globe;
+}[] = [
+  { value: "http", label: "HTTP", icon: Globe },
+  { value: "tcp", label: "TCP port", icon: Plug },
+  { value: "dns", label: "DNS", icon: Route },
+  { value: "ssl", label: "SSL/TLS", icon: ShieldCheck },
+];
 
 type FieldErrors = Partial<Record<keyof CreateProjectFormValues, string[]>>;
 
@@ -403,24 +420,27 @@ export function AddProjectForm({
         <div className="flex flex-col gap-4">
           <SectionLabel>Health check</SectionLabel>
 
-          <Field orientation="responsive">
-            <FieldLabel htmlFor="check_type">Check type</FieldLabel>
-            <Select
+          <Field>
+            <FieldLabel>Check type</FieldLabel>
+            <RadioGroup
               value={values.check_type}
               onValueChange={(value) =>
                 updateField("check_type", value as FormState["check_type"])
               }
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
             >
-              <SelectTrigger id="check_type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="http">HTTP</SelectItem>
-                <SelectItem value="tcp">TCP port</SelectItem>
-                <SelectItem value="dns">DNS resolution</SelectItem>
-                <SelectItem value="ssl">SSL/TLS certificate</SelectItem>
-              </SelectContent>
-            </Select>
+              {CHECK_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <label
+                  key={value}
+                  htmlFor={`check_type_${value}`}
+                  className="flex cursor-pointer flex-col items-center gap-1.5 rounded-md border p-3 text-center transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5 dark:has-[[data-state=checked]]:bg-primary/10"
+                >
+                  <RadioGroupItem value={value} id={`check_type_${value}`} className="sr-only" />
+                  <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium">{label}</span>
+                </label>
+              ))}
+            </RadioGroup>
           </Field>
 
           <Field data-invalid={!!fieldErrors.health_url}>

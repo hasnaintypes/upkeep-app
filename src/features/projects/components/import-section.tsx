@@ -5,7 +5,6 @@ import { CheckCircle2, UploadCloud, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { notify } from "@/lib/toast";
 import {
   MAX_BULK_IMPORT_ROWS,
@@ -153,13 +152,18 @@ export function ImportSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium">Import from a file</span>
-          <span className="text-xs text-muted-foreground">
-            Upload a <code>.csv</code> or <code>.json</code> file to add multiple projects at once.
-          </span>
+    <div className="flex flex-col gap-4 rounded-lg border border-dashed p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+            <UploadCloud className="size-4 text-muted-foreground" aria-hidden="true" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Import from a file</span>
+            <span className="text-xs text-muted-foreground">
+              Upload a <code>.csv</code> or <code>.json</code> file to add multiple projects at once.
+            </span>
+          </div>
         </div>
         <Button
           type="button"
@@ -246,8 +250,6 @@ export function ImportSection({
           </Button>
         </div>
       )}
-
-      <Separator />
     </div>
   );
 }
