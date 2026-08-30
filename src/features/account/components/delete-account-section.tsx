@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { TriangleAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,7 +73,10 @@ export function DeleteAccountSection({ email }: { email: string }) {
   return (
     <Card className="border-destructive/50">
       <CardHeader>
-        <CardTitle>Danger zone</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <TriangleAlert className="size-4 text-destructive" aria-hidden="true" />
+          Danger zone
+        </CardTitle>
         <CardDescription>
           Permanently delete your account and everything in it -- projects, check
           history, incidents, notification channels, and API keys. This can&apos;t
