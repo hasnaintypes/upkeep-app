@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, KeyRoundIcon } from "lucide-react";
+import { KeyRoundIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,33 +12,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDateTime } from "@/lib/utils";
 import { notify } from "@/lib/toast";
+import { ApiKeyTable } from "./api-key-table";
 import { GenerateApiKeyDialog } from "./generate-api-key-dialog";
 import { revokeApiKey } from "../lib/actions";
 import type { ApiKey } from "../types";
 
-function formatTimestamp(value: string | null): string {
-  return value ? formatDateTime(value) : "Never";
-}
-
 /**
  * API key management (#47): generate, list, and revoke this user's keys.
- * Rendered on /dashboard/api-keys. Mirrors the empty-state/`Card`+`Table`
- * shape of `GlobalIncidentTable` and the `AlertDialog` revoke-confirmation
- * pattern of `ChannelList`'s delete flow -- revoking a key is just as
+ * Rendered on /dashboard/api-keys. Owns state/mutations (create/revoke) and
+ * delegates the actual table rendering to `ApiKeyTable` (the same TanStack
+ * Table v9 shell as the projects page, minus row selection/bulk actions) --
+ * same parent-owns-mutations/child-owns-table-view split as
+ * `ProjectList`/`ProjectTable`. The `AlertDialog` revoke-confirmation
+ * pattern mirrors `ChannelList`'s delete flow -- revoking a key is just as
  * irreversible as deleting a channel.
  */
 export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
@@ -84,62 +72,14 @@ export function ApiKeyList({ initialKeys }: { initialKeys: ApiKey[] }) {
           description="Generate one to authenticate programmatic project registration."
         />
       ) : (
-        <Card>
-          <CardContent className="flex flex-col gap-4 px-4 sm:px-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Label</TableHead>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell">Created</TableHead>
-                  <TableHead className="hidden sm:table-cell">Last used</TableHead>
-                  <TableHead className="text-right sr-only">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {keys.map((key) => {
-                  const isRevoked = !!key.revoked_at;
-                  return (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium">{key.label}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {key.key_prefix}...
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={isRevoked ? "outline" : "secondary"}>
-                          {isRevoked ? "Revoked" : "Active"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">
-                        {formatTimestamp(key.created_at)}
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground sm:table-cell">
-                        {formatTimestamp(key.last_used_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!isRevoked && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Revoke key"
-                            disabled={pendingId === key.id}
-                            onClick={() => {
-                              setRevokeError(null);
-                              setRevokingKey(key);
-                            }}
-                          >
-                            <Ban className="size-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <ApiKeyTable
+          keys={keys}
+          pendingId={pendingId}
+          onRequestRevoke={(key) => {
+            setRevokeError(null);
+            setRevokingKey(key);
+          }}
+        />
       )}
 
       <AlertDialog open={!!revokingKey} onOpenChange={(open) => !open && setRevokingKey(null)}>
