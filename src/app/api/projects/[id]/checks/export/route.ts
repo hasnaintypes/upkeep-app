@@ -76,4 +76,6 @@ const CHECK_EXPORT_CSV_COLUMNS = [
   "response_snippet",
   "checked_at",
   "is_rate_limited",
+  "region",
+  "is_consensus",
 ];

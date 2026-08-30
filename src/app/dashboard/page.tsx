@@ -1,47 +1,47 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
-import { FolderIcon, SearchXIcon } from "lucide-react";
+import { FolderIcon } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { TableSkeleton } from "@/components/ui/loading-skeletons";
+import { ChartCardSkeleton, StatCardsSkeleton, TableSkeleton } from "@/components/ui/loading-skeletons";
+import { SectionLabel } from "@/components/ui/section-label";
 import { AddProjectTrigger, getActiveProjects } from "@/features/projects";
 import {
-  filterOverviewRows,
-  getAvailableProviders,
-  getAvailableTags,
+  getOpenIncidentCount,
+  getPortfolioIncidentDailyCounts,
   getProjectUptimeSummaries,
-  hasActiveFilters,
-  OverviewFilterBar,
+  OverviewStats,
   OverviewTable,
-  parseOverviewFilters,
-  type OverviewSearchParams,
+  PortfolioIncidentsChart,
 } from "@/features/dashboard";
 
 /**
  * Dashboard overview page (PRD §5.6, Phase 4, issues #29 and #33): every
  * active project owned by the signed-in user, with current status,
- * last-checked time, rolling 24h/7d/30d/90d uptime %, and filter/search
- * controls (name search, tag/hosting-provider/status multi-select).
+ * last-checked time, and rolling 24h/7d/30d/90d uptime %. Above the table,
+ * a portfolio-wide scan layer: `OverviewStats`' four stat cards (active
+ * projects, 7d portfolio uptime, down now, open incidents) and
+ * `PortfolioIncidentsChart`'s daily opened-vs-resolved incidents chart --
+ * deliberately not a repeat of the per-project detail page's single-project
+ * response-time chart / heatmap, this is portfolio-wide (every project at
+ * once) rather than one project over time.
  *
- * `OverviewLoader` does the auth guard + both data fetches (RLS-scoped
- * project list + the get_project_uptime_summary() RPC, one round trip each
- * -- see features/dashboard/lib/queries.ts) and is wrapped in `<Suspense>`,
- * per this project's standard pattern for isolating dynamic data access
- * under `cacheComponents: true` (see src/app/dashboard/projects/page.tsx
- * and AGENTS.md's Gotchas section). Filtering itself happens entirely
- * in-memory against the already-fetched active-project list (see
- * lib/filters.ts) -- this app's scale (~50 projects, PRD §9) doesn't
- * warrant building dynamic SQL for what's ultimately a handful of
- * `Array.filter` predicates over data already in hand.
+ * `OverviewLoader` does the auth guard + all four data fetches (RLS-scoped
+ * project list, the get_project_uptime_summary() RPC, an open-incident
+ * count, and 30 days of daily incident counts -- one round trip each, see
+ * features/dashboard/lib/queries.ts) and is wrapped in `<Suspense>`, per
+ * this project's standard pattern for isolating dynamic data access under
+ * `cacheComponents: true` (see src/app/dashboard/projects/page.tsx and
+ * AGENTS.md's Gotchas section). Search/filter/sort of the fetched list
+ * happens entirely client-side in `OverviewTable` (the same TanStack Table
+ * v9 shell as Projects/API keys) -- this app's scale (~50 projects, PRD §9)
+ * doesn't warrant a server round trip per filter change; the stat cards
+ * reuse that same already-fetched project/summary data (no extra round
+ * trip beyond the two incident queries).
  */
-async function OverviewLoader({
-  searchParams,
-}: {
-  searchParams: Promise<OverviewSearchParams>;
-}) {
+async function OverviewLoader() {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
 
@@ -49,8 +49,17 @@ async function OverviewLoader({
     redirect("/auth/login");
   }
 
-  const [{ data: projects, error: projectsError }, { data: summaries, error: summaryError }] =
-    await Promise.all([getActiveProjects(), getProjectUptimeSummaries()]);
+  const [
+    { data: projects, error: projectsError },
+    { data: summaries, error: summaryError },
+    { data: openIncidents, error: incidentError },
+    { data: incidentDailyCounts, error: incidentDailyError },
+  ] = await Promise.all([
+    getActiveProjects(),
+    getProjectUptimeSummaries(),
+    getOpenIncidentCount(),
+    getPortfolioIncidentDailyCounts(),
+  ]);
 
   if (projectsError) {
     return (
@@ -63,6 +72,13 @@ async function OverviewLoader({
     return (
       <p className="text-sm text-destructive">
         Failed to load uptime data: {summaryError}
+      </p>
+    );
+  }
+  if (incidentError || incidentDailyError) {
+    return (
+      <p className="text-sm text-destructive">
+        Failed to load incident data: {incidentError ?? incidentDailyError}
       </p>
     );
   }
@@ -82,49 +98,46 @@ async function OverviewLoader({
     );
   }
 
-  const filters = parseOverviewFilters(await searchParams);
-  const availableTags = getAvailableTags(projects);
-  const availableProviders = getAvailableProviders(projects);
-  const summaryByProjectId = new Map((summaries ?? []).map((s) => [s.project_id, s]));
-  const filteredProjects = filterOverviewRows(projects, summaryByProjectId, filters);
+  const resolvedSummaries = summaries ?? [];
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <OverviewFilterBar
-        filters={filters}
-        availableTags={availableTags}
-        availableProviders={availableProviders}
-        pathname="/dashboard"
-      />
-      {filteredProjects.length === 0 ? (
-        <EmptyState
-          icon={SearchXIcon}
-          title="No projects match your filters"
-          description="Try removing a filter or searching for something else."
-          action={
-            hasActiveFilters(filters) ? (
-              <Button variant="outline" asChild>
-                <Link href="/dashboard">Clear filters</Link>
-              </Button>
-            ) : undefined
-          }
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <SectionLabel>Metrics</SectionLabel>
+        <OverviewStats
+          projects={projects}
+          summaries={resolvedSummaries}
+          openIncidents={openIncidents}
         />
-      ) : (
-        <OverviewTable projects={filteredProjects} summaries={summaries ?? []} />
-      )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <SectionLabel>Activity</SectionLabel>
+        <PortfolioIncidentsChart points={incidentDailyCounts ?? []} />
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <SectionLabel>Projects</SectionLabel>
+        <OverviewTable projects={projects} summaries={resolvedSummaries} />
+      </div>
     </div>
   );
 }
 
+/** Mirrors the real page's three sections (stat cards, incidents chart,
+ * project table) instead of a single table-shaped skeleton that ignores the
+ * two sections above it. */
 function OverviewSkeleton() {
-  return <TableSkeleton columns={6} />;
+  return (
+    <div className="flex flex-col gap-8">
+      <StatCardsSkeleton />
+      <ChartCardSkeleton height="h-64" />
+      <TableSkeleton columns={6} />
+    </div>
+  );
 }
 
-export default function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<OverviewSearchParams>;
-}) {
+export default function DashboardPage() {
   return (
     <div className="flex flex-1 w-full flex-col gap-8">
       <div>
@@ -134,7 +147,7 @@ export default function DashboardPage({
         </p>
       </div>
       <Suspense fallback={<OverviewSkeleton />}>
-        <OverviewLoader searchParams={searchParams} />
+        <OverviewLoader />
       </Suspense>
     </div>
   );

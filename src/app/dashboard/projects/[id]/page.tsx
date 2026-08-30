@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowLeftIcon } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChartCardSkeleton } from "@/components/ui/loading-skeletons";
+import { SectionLabel } from "@/components/ui/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { checkTargetPrefix, getProjectById } from "@/features/projects";
+import { getProjectById } from "@/features/projects";
 import {
   CheckLogTable,
   getProjectChecksPage,
@@ -14,8 +15,10 @@ import {
   getProjectUptimeSummaries,
   getResponseTimeSeries,
   IncidentHistoryTable,
+  parseCheckLogFilters,
+  ProjectDetailHeader,
+  ProjectHistoryTabs,
   ResponseTimeSection,
-  StatusBadge,
   UptimeHeatmap,
   UPTIME_WINDOWS,
 } from "@/features/dashboard";
@@ -25,12 +28,14 @@ import type {
   ResponseTimeSeries,
   UptimeWindowKey,
 } from "@/features/dashboard";
-import { getNotificationChannels, getProjectNotificationRules, ProjectNotificationRules } from "@/features/notifications";
 
 /**
  * Per-project detail page (PRD §5.6, Phase 4/5): response-time graph (#30),
  * uptime heatmap/timeline (#31), incident history (#38), and raw check log
- * (#32) -- matching the PRD's own ordering for this page.
+ * (#32) -- matching the PRD's own ordering for this page. Per-project
+ * notification rule configuration (`ProjectNotificationRules`) deliberately
+ * doesn't live here -- removed from this page's UI; channel management
+ * itself is on /dashboard/settings.
  */
 async function ProjectDetailLoader({
   params,
@@ -40,6 +45,8 @@ async function ProjectDetailLoader({
   searchParams: Promise<{
     cursor?: string;
     dir?: string;
+    status?: string;
+    q?: string;
     incidentCursor?: string;
     incidentDir?: string;
   }>;
@@ -52,11 +59,12 @@ async function ProjectDetailLoader({
   }
 
   const { id } = await params;
-  const { cursor, dir, incidentCursor, incidentDir } = await searchParams;
+  const { cursor, dir, status, q, incidentCursor, incidentDir } = await searchParams;
   const checksCursor: CheckLogCursor | undefined =
     cursor && (dir === "next" || dir === "previous")
       ? { checkedAt: cursor, direction: dir }
       : undefined;
+  const checkLogFilters = parseCheckLogFilters({ status, q });
   const incidentsCursor: IncidentCursor | undefined =
     incidentCursor && (incidentDir === "next" || incidentDir === "previous")
       ? { startedAt: incidentCursor, direction: incidentDir }
@@ -80,8 +88,6 @@ async function ProjectDetailLoader({
     { data: dailyHistory, error: historyError },
     { data: incidents, error: incidentsError },
     { data: checksPage, error: checksError },
-    { data: notificationRules, error: notificationRulesError },
-    { data: notificationChannels, error: notificationChannelsError },
   ] = await Promise.all([
     Promise.all(
       UPTIME_WINDOWS.map(async (w) => {
@@ -91,9 +97,7 @@ async function ProjectDetailLoader({
     ),
     getProjectDailyHistory(project.id),
     getProjectIncidentsPage(project.id, incidentsCursor),
-    getProjectChecksPage(project.id, checksCursor),
-    getProjectNotificationRules(project.id),
-    getNotificationChannels(),
+    getProjectChecksPage(project.id, checkLogFilters, checksCursor),
   ]);
   const seriesByWindow = Object.fromEntries(seriesEntries) as Record<
     UptimeWindowKey,
@@ -101,87 +105,91 @@ async function ProjectDetailLoader({
   >;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Link
-          href="/dashboard/projects"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeftIcon className="size-3.5" />
-          Projects
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold">{project.name}</h1>
-          <StatusBadge status={summary?.last_status ?? null} />
-        </div>
-        {project.description && (
-          <p className="text-sm text-muted-foreground">{project.description}</p>
+    <div className="flex flex-col gap-8">
+      <ProjectDetailHeader project={project} summary={summary} />
+
+      <div className="flex flex-col gap-4">
+        <SectionLabel>Monitoring</SectionLabel>
+        <ResponseTimeSection seriesByWindow={seriesByWindow} />
+
+        {historyError ? (
+          <p className="text-sm text-destructive">
+            Failed to load uptime history: {historyError}
+          </p>
+        ) : (
+          <UptimeHeatmap history={dailyHistory ?? []} />
         )}
-        <p className="text-sm text-muted-foreground">
-          {checkTargetPrefix(project.check_type, project.method)} {project.health_url}
-        </p>
-        {project.rate_limit_backoff_until &&
-          new Date(project.rate_limit_backoff_until) > new Date() && (
-            <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
-              Checks paused until{" "}
-              {new Date(project.rate_limit_backoff_until).toLocaleTimeString(undefined, {
-                hour: "numeric",
-                minute: "2-digit",
-              })}{" "}
-              — this host has been rate-limiting Upkeep&apos;s requests.
-            </p>
-          )}
       </div>
 
-      <ResponseTimeSection seriesByWindow={seriesByWindow} />
-
-      {historyError ? (
-        <p className="text-sm text-destructive">
-          Failed to load uptime history: {historyError}
-        </p>
-      ) : (
-        <UptimeHeatmap history={dailyHistory ?? []} />
-      )}
-
-      {incidentsError ? (
-        <p className="text-sm text-destructive">Failed to load incidents: {incidentsError}</p>
-      ) : (
-        <IncidentHistoryTable
-          projectId={project.id}
-          page={incidents ?? { rows: [], hasNext: false, hasPrevious: false }}
+      <div className="flex flex-col gap-4">
+        <SectionLabel>History</SectionLabel>
+        <ProjectHistoryTabs
+          incidents={
+            incidentsError ? (
+              <p className="text-sm text-destructive">Failed to load incidents: {incidentsError}</p>
+            ) : (
+              <IncidentHistoryTable
+                projectId={project.id}
+                page={incidents ?? { rows: [], hasNext: false, hasPrevious: false }}
+              />
+            )
+          }
+          checkLog={
+            checksError ? (
+              <p className="text-sm text-destructive">Failed to load check log: {checksError}</p>
+            ) : (
+              <CheckLogTable
+                projectId={project.id}
+                page={checksPage ?? { rows: [], hasNext: false, hasPrevious: false }}
+                filters={checkLogFilters}
+                incidentCursor={incidentCursor}
+                incidentDir={incidentDir}
+              />
+            )
+          }
         />
-      )}
-
-      {checksError ? (
-        <p className="text-sm text-destructive">Failed to load check log: {checksError}</p>
-      ) : (
-        <CheckLogTable
-          projectId={project.id}
-          page={checksPage ?? { rows: [], hasNext: false, hasPrevious: false }}
-        />
-      )}
-
-      {notificationRulesError || notificationChannelsError ? (
-        <p className="text-sm text-destructive">
-          Failed to load notification settings:{" "}
-          {notificationRulesError ?? notificationChannelsError}
-        </p>
-      ) : (
-        <ProjectNotificationRules
-          projectId={project.id}
-          initialRules={notificationRules ?? []}
-          allChannels={notificationChannels ?? []}
-        />
-      )}
+      </div>
     </div>
   );
 }
 
+/** Mirrors the real page's shape (header card, monitoring charts, history
+ * tabs) instead of two unrelated gray bars -- so the loading state doesn't
+ * visibly jump in height/structure once the real content mounts. */
 function ProjectDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-64 w-full" />
+    <div className="flex flex-col gap-8">
+      <Card variant="soft">
+        <CardContent className="flex flex-col gap-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="size-14 shrink-0 rounded-full" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-x-6 gap-y-4 sm:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="flex flex-col gap-1.5">
+                <Skeleton className="h-6 w-12" />
+                <Skeleton className="h-3 w-14" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-3 w-20" />
+        <ChartCardSkeleton />
+        <ChartCardSkeleton height="h-40" />
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
     </div>
   );
 }
@@ -194,6 +202,8 @@ export default function ProjectDetailPage({
   searchParams: Promise<{
     cursor?: string;
     dir?: string;
+    status?: string;
+    q?: string;
     incidentCursor?: string;
     incidentDir?: string;
   }>;

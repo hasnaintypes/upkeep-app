@@ -111,6 +111,23 @@ export type CheckLogRow = {
    * -- the prober backs the project off rather than treating this as a
    * real outage; the check log distinguishes it from a plain "Down" row. */
   is_rate_limited: boolean;
+  /** The AWS region this specific row was executed from (#60,
+   * region-probe.ts) -- populated for a multi-region tick's N per-region
+   * diagnostic rows (`is_consensus: false`) and for a manual "run check
+   * now" click (tagged with whatever region that ad hoc invocation
+   * happened to execute in); `null` for a multi-region tick's own
+   * consensus row, which represents a majority vote across regions, not
+   * any single one. */
+  region: string | null;
+  /** True for the one row per check round that counts toward
+   * `incidents.ts`'s escalation/resolution streak -- either a
+   * single-region check (this app's default) or #60's majority-vote
+   * consensus row for a multi-region project. False only for the N raw
+   * per-region diagnostic rows a regionally fanned-out tick writes
+   * alongside that one consensus row (see the `add_multi_region_probing`
+   * migration) -- shown in the check log as supplementary, not additional
+   * outages, since only the consensus row is ever a real vote. */
+  is_consensus: boolean;
 };
 
 /**
@@ -132,6 +149,21 @@ export type CheckLogPage = {
 export type CheckLogCursor = {
   checkedAt: string;
   direction: "next" | "previous";
+};
+
+/** Check log filter state, parsed from the per-project detail page's own
+ * `status`/`q` URL query params (`parseCheckLogFilters`) -- URL-driven, same
+ * reasoning as `GlobalIncidentFilters`: the check log is itself
+ * server-paginated, so a filter has to be a real query param the server-side
+ * query can read, not client-side state over an already-fetched page. */
+export type CheckLogFilters = {
+  status: CheckStatus | null;
+  q: string | null;
+};
+
+export type CheckLogSearchParams = {
+  status?: string;
+  q?: string;
 };
 
 /**
@@ -181,9 +213,8 @@ export type IncidentCursor = {
  * §5.4, Phase 5, #39). `status` is a coarse open/resolved split (not the
  * five-way `CheckStatus` -- an incident itself only has two states, see
  * `Incident`'s own doc comment), and `since` is a single-select time-range
- * cutoff, distinct in kind from the multi-select facets on the overview
- * page's `OverviewFilters` (#33) -- project/status/time-range are each
- * naturally one-at-a-time here, not a set of chips to toggle in/out. */
+ * cutoff -- project/status/time-range are each naturally one-at-a-time
+ * here, not a multi-select set of chips to toggle in/out. */
 export type IncidentStatusFilter = "open" | "resolved";
 
 /** Deliberately its own type, not a reuse of dashboard's `UptimeWindowKey`
@@ -215,4 +246,18 @@ export type GlobalIncidentPage = {
   rows: GlobalIncidentRow[];
   hasNext: boolean;
   hasPrevious: boolean;
+};
+
+/**
+ * One day's incident activity across every project the signed-in user
+ * owns, for the dashboard overview page's incidents chart -- portfolio-wide
+ * and time-series, unlike the per-project detail page's charts (a single
+ * project's response time / uptime heatmap). `day` is zero-filled for every
+ * day in the requested range by `getPortfolioIncidentDailyCounts` (not just
+ * days that had activity), so the chart always renders a continuous axis.
+ */
+export type PortfolioIncidentDailyPoint = {
+  day: string;
+  opened: number;
+  resolved: number;
 };

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CHECK_LOG_PAGE_SIZE, INCIDENT_PAGE_SIZE } from "../constants";
 import type {
   CheckLogCursor,
+  CheckLogFilters,
   CheckLogPage,
   CheckLogRow,
   DailyHistoryPoint,
@@ -12,6 +13,7 @@ import type {
   IncidentCursor,
   IncidentPage,
   IncidentTimeRangeKey,
+  PortfolioIncidentDailyPoint,
   ProjectUptimeSummary,
   ResponseTimeRawPoint,
   ResponseTimeSeries,
@@ -38,6 +40,91 @@ export async function getProjectUptimeSummaries(): Promise<{
     return { data: null, error: error.message };
   }
   return { data: (data ?? []) as unknown as ProjectUptimeSummary[], error: null };
+}
+
+/**
+ * Count of currently-open incidents (`resolved_at IS NULL`) across every
+ * project the signed-in user owns, for the overview page's stats row. A
+ * single `count: "exact", head: true` query, not a page of rows -- same
+ * "don't re-check ownership here" convention as every other query in this
+ * module, relying entirely on `incidents_select_own` RLS for scoping.
+ */
+export async function getOpenIncidentCount(): Promise<{
+  data: number | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("incidents")
+    .select("id", { count: "exact", head: true })
+    .is("resolved_at", null);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+  return { data: count ?? 0, error: null };
+}
+
+/** How many days the overview page's incidents chart covers. */
+const PORTFOLIO_INCIDENT_CHART_DAYS = 30;
+
+/**
+ * Per-day incidents-opened / incidents-resolved counts across every project
+ * the signed-in user owns, for the overview page's incidents chart. One
+ * query (no `project_id` filter -- relies on `incidents_select_own` RLS for
+ * scoping, same convention as `getIncidentsPage`), bucketed in JS rather
+ * than a new SQL aggregate function: incidents are a low-volume table
+ * relative to `checks`/`checks_aggregated` (this app has no incident-rate
+ * anywhere near the check-ingestion volume those tables see), so pulling
+ * every incident that touched the last `days` days and bucketing here is
+ * cheap and avoids a migration for what's a one-off page-load aggregate.
+ *
+ * Zero-fills every day in the range (not just days that had activity) so
+ * the chart always renders a continuous, evenly-spaced axis instead of
+ * gaps wherever nothing happened.
+ */
+export async function getPortfolioIncidentDailyCounts(
+  days: number = PORTFOLIO_INCIDENT_CHART_DAYS,
+): Promise<{ data: PortfolioIncidentDailyPoint[] | null; error: string | null }> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const sinceIso = since.toISOString();
+
+  // An incident counts toward this window if it opened *or* resolved within
+  // it -- one that opened before the window but resolved inside it should
+  // still show up as a "resolved" data point on the day it resolved.
+  const { data, error } = await supabase
+    .from("incidents")
+    .select("started_at, resolved_at")
+    .or(`started_at.gte.${sinceIso},resolved_at.gte.${sinceIso}`);
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  const buckets = new Map<string, { opened: number; resolved: number }>();
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date();
+    day.setUTCDate(day.getUTCDate() - i);
+    buckets.set(day.toISOString().slice(0, 10), { opened: 0, resolved: 0 });
+  }
+
+  for (const row of data) {
+    const openedDay = row.started_at.slice(0, 10);
+    const openedBucket = buckets.get(openedDay);
+    if (openedBucket) openedBucket.opened += 1;
+
+    if (row.resolved_at) {
+      const resolvedDay = row.resolved_at.slice(0, 10);
+      const resolvedBucket = buckets.get(resolvedDay);
+      if (resolvedBucket) resolvedBucket.resolved += 1;
+    }
+  }
+
+  return {
+    data: Array.from(buckets.entries()).map(([day, counts]) => ({ day, ...counts })),
+    error: null,
+  };
 }
 
 /** 24h/7d read raw `checks` rows directly; 30d/90d read `checks_aggregated`
@@ -164,7 +251,7 @@ export async function getProjectDailyHistory(projectId: string): Promise<{
 }
 
 const CHECK_LOG_COLUMNS =
-  "id, status, http_status, response_time_ms, error_message, response_snippet, checked_at, is_rate_limited";
+  "id, status, http_status, response_time_ms, error_message, response_snippet, checked_at, is_rate_limited, region, is_consensus";
 
 /**
  * One page of a project's raw check log, newest-first (PRD §5.6, Phase 4,
@@ -179,14 +266,32 @@ const CHECK_LOG_COLUMNS =
  * regardless of navigation history, including on the very first page
  * (`hasPrevious` naturally comes back false since nothing is newer than
  * the newest row already on that page).
+ *
+ * `filters.status`/`filters.q` are applied as real SQL predicates (an `eq`
+ * and an `ilike`, respectively) to every query below, including the
+ * `hasNext`/`hasPrevious` existence checks -- same reasoning as
+ * `getIncidentsPage`'s own project/status/time-range filters: an unbounded,
+ * server-paginated table filters at the query, not in memory, and its
+ * pagination boundaries need to be computed against that same filtered set,
+ * not the project's full unfiltered history. `%`/`_` in the search text are
+ * escaped so a user's literal percent sign doesn't act as an `ilike`
+ * wildcard.
  */
 export async function getProjectChecksPage(
   projectId: string,
+  filters: CheckLogFilters,
   cursor?: CheckLogCursor,
 ): Promise<{ data: CheckLogPage | null; error: string | null }> {
   const supabase = await createClient();
+  const escapedQuery = filters.q?.replace(/[%_]/g, (char) => `\\${char}`);
 
   let pageQuery = supabase.from("checks").select(CHECK_LOG_COLUMNS).eq("project_id", projectId);
+  if (filters.status) {
+    pageQuery = pageQuery.eq("status", filters.status);
+  }
+  if (escapedQuery) {
+    pageQuery = pageQuery.ilike("error_message", `%${escapedQuery}%`);
+  }
 
   if (cursor?.direction === "next") {
     pageQuery = pageQuery.lt("checked_at", cursor.checkedAt).order("checked_at", {
@@ -217,19 +322,27 @@ export async function getProjectChecksPage(
   const newest = rows[0].checked_at;
   const oldest = rows[rows.length - 1].checked_at;
 
+  let olderQuery = supabase
+    .from("checks")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .lt("checked_at", oldest);
+  let newerQuery = supabase
+    .from("checks")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .gt("checked_at", newest);
+  if (filters.status) {
+    olderQuery = olderQuery.eq("status", filters.status);
+    newerQuery = newerQuery.eq("status", filters.status);
+  }
+  if (escapedQuery) {
+    olderQuery = olderQuery.ilike("error_message", `%${escapedQuery}%`);
+    newerQuery = newerQuery.ilike("error_message", `%${escapedQuery}%`);
+  }
+
   const [{ count: olderCount, error: olderError }, { count: newerCount, error: newerError }] =
-    await Promise.all([
-      supabase
-        .from("checks")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", projectId)
-        .lt("checked_at", oldest),
-      supabase
-        .from("checks")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", projectId)
-        .gt("checked_at", newest),
-    ]);
+    await Promise.all([olderQuery, newerQuery]);
 
   if (olderError || newerError) {
     return { data: null, error: (olderError ?? newerError)!.message };
@@ -389,7 +502,7 @@ type RawGlobalIncidentRow = Incident & { projects: { name: string } | null };
  * query, since there's no `project_id` predicate to make the per-project
  * composite index useful here) plus optional project/status/time-range
  * filters applied as real SQL predicates -- not in-memory like the
- * overview page's `filterOverviewRows` (#33), since unlike that already
+ * overview page's client-side table filtering, since unlike that already
  * fully-fetched, bounded (~50 project) list, this dataset can grow
  * unboundedly and is itself paginated.
  *

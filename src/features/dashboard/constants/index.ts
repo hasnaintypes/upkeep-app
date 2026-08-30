@@ -67,7 +67,7 @@ export const HEATMAP_CELL_COLOR = {
 } as const;
 
 /** Rows per page for the raw check log table (PRD §5.6, Phase 4, #32). */
-export const CHECK_LOG_PAGE_SIZE = 25;
+export const CHECK_LOG_PAGE_SIZE = 10;
 
 /** Rows per page for the per-project incident history view (PRD §5.4,
  * Phase 5, #38) -- same value and reasoning as `CHECK_LOG_PAGE_SIZE`. */
