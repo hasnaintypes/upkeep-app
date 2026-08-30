@@ -9,8 +9,9 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
  * show "Projects", not nothing. */
 const PAGE_TITLES: { prefix: string; title: string }[] = [
   { prefix: "/dashboard/projects", title: "Projects" },
-  { prefix: "/dashboard/notifications", title: "Notifications" },
   { prefix: "/dashboard/api-keys", title: "API Keys" },
+  { prefix: "/dashboard/settings", title: "Settings" },
+  { prefix: "/dashboard/account", title: "Account" },
   { prefix: "/dashboard", title: "Overview" },
 ];
 

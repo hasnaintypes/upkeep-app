@@ -42,14 +42,21 @@ Every incident across every project you own, most recent first, filterable
 by project, status, and time range -- the same per-incident data as each
 project's own incident history, just not scoped to one project.
 
-## Notifications
-
-Manage notification channels (Discord, email, generic webhook) independently
-of any one project -- create a channel here, then attach it to projects from
-each project's own detail page. See [Notifications](/docs/notifications).
-
 ## API Keys
 
 Generate and revoke per-user API keys for programmatic project registration
 from a deploy step, instead of the **Add project** form. See
 [API Keys](/docs/api-keys).
+
+## Account and Settings
+
+Reached from the user menu in the sidebar footer, not the main nav:
+
+- **Account** (`/dashboard/account`) -- your signed-in email, changing your
+  password, and permanently deleting your account (and everything it owns
+  -- projects, checks, incidents, channels, API keys). Deletion requires
+  typing your email to confirm and can't be undone.
+- **Settings** (`/dashboard/settings`) -- app-level configuration, starting
+  with notification channels (Discord, email, generic webhook) -- create a
+  channel here, then attach it to projects from each project's own detail
+  page. See [Notifications](/docs/notifications).

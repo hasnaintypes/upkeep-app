@@ -342,7 +342,7 @@ export function ProjectNotificationRules({
         {allChannels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No notification channels configured yet.{" "}
-            <Link href="/dashboard/notifications" className="underline underline-offset-4">
+            <Link href="/dashboard/settings" className="underline underline-offset-4">
               Add one
             </Link>{" "}
             to start alerting on this project&apos;s status.

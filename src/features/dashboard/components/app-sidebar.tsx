@@ -3,7 +3,6 @@
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  BellIcon,
   CirclePower,
   FolderIcon,
   KeyRoundIcon,
@@ -26,7 +25,6 @@ const NAV_MAIN_ITEMS: NavMainItem[] = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Projects", url: "/dashboard/projects", icon: FolderIcon },
   { title: "Incidents", url: "/dashboard/incidents", icon: SirenIcon },
-  { title: "Notifications", url: "/dashboard/notifications", icon: BellIcon },
   { title: "API Keys", url: "/dashboard/api-keys", icon: KeyRoundIcon },
 ];
 
@@ -37,8 +35,8 @@ const NAV_MAIN_ITEMS: NavMainItem[] = [
  * replace the block's own app-sidebar.tsx). Real nav items instead of
  * the block's five fake ones (Dashboard/Lifecycle/Analytics/Projects/Team,
  * all `url: "#"`), and no `NavDocuments`/`NavSecondary` sections -- this
- * app has no documents library or settings/help pages yet, so those
- * sections would be dead links.
+ * app has no documents library, and Account/Settings live in `NavUser`'s
+ * dropdown (see nav-user.tsx) rather than the main nav, not here.
  *
  * `userSlot`/`addProjectSlot` -- not fetched-here props -- because this is
  * a Client Component (the sidebar's collapse/open state needs

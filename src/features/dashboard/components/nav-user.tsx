@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOutIcon, MoreVerticalIcon } from "lucide-react";
+import { LogOutIcon, MoreVerticalIcon, SettingsIcon, UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -38,12 +39,12 @@ function initialFor(email: string) {
 
 /**
  * Sidebar footer user menu (adapted from dashboard-01's nav-user.tsx):
- * avatar-initial + email + a dropdown with a single real action, "Log
- * out" -- wired to the existing `signOut()` client action
+ * avatar-initial + email + a dropdown with "Account" (/dashboard/account)
+ * and "Settings" (/dashboard/settings) above a separator, then "Log out"
+ * -- wired to the existing `signOut()` client action
  * (features/auth/lib/actions.ts), the same one `LogoutButton` uses. The
- * block's own version also has Account/Billing/Notifications items; those
- * aren't included here since none of those features exist in this app yet
- * (no fake menu items).
+ * block's own version also has a "Billing" item; that's not included here
+ * since there's no billing feature in this app (no fake menu items).
  */
 export function NavUser({ email }: { email: string }) {
   const { isMobile } = useSidebar();
@@ -90,6 +91,19 @@ export function NavUser({ email }: { email: string }) {
                 <span className="truncate text-xs text-muted-foreground">{email}</span>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/account">
+                <UserIcon />
+                Account
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/dashboard/settings">
+                <SettingsIcon />
+                Settings
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOutIcon />
