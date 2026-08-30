@@ -12,6 +12,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { SectionLabel } from "@/components/ui/section-label";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -94,6 +96,54 @@ function toFormState(project?: Project): FormState {
     keep_alive_timezone: project.keep_alive_timezone ?? "",
     is_public: project.is_public,
   };
+}
+
+/** Label/placeholder/input-type/description for the one health-check target
+ * field, keyed by check type -- replaces four separately-written `<Field>`
+ * blocks (one per type) that only ever differed in these four values, so a
+ * future check type is one new case here instead of a fifth near-duplicate
+ * block. */
+function healthTargetConfig(checkType: FormState["check_type"]): {
+  label: string;
+  inputType: "text" | "url";
+  placeholder: string;
+  description: string;
+} {
+  switch (checkType) {
+    case "tcp":
+      return {
+        label: "Health check target",
+        inputType: "text",
+        placeholder: "db.example.com:5432",
+        description:
+          'Enter as "host:port". Only whether a TCP connection can be opened is checked -- no request is sent.',
+      };
+    case "dns":
+      return {
+        label: "Hostname",
+        inputType: "text",
+        placeholder: "example.com",
+        description:
+          "No scheme or port. Only whether this hostname resolves is checked -- no request is sent.",
+      };
+    case "ssl":
+      return {
+        label: "Health check target",
+        inputType: "text",
+        placeholder: "example.com:443",
+        description:
+          'Enter as "host:port". Checks the certificate is valid and not expiring soon -- no request is sent.',
+      };
+    default:
+      return {
+        label: "Health check URL",
+        inputType: "url",
+        placeholder: "https://your-app.example.com/health",
+        description: `Must use https://${
+          process.env.NODE_ENV !== "production" ? ", or http://localhost while developing" : ""
+        }.`,
+      };
+  }
 }
 
 type FieldErrors = Partial<Record<keyof CreateProjectFormValues, string[]>>;
@@ -300,6 +350,8 @@ export function AddProjectForm({
     }
   }
 
+  const targetConfig = healthTargetConfig(values.check_type);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -316,243 +368,172 @@ export function AddProjectForm({
           </div>
         )}
 
-        <Field data-invalid={!!fieldErrors.name}>
-          <FieldLabel htmlFor="name">Name</FieldLabel>
-          <Input
-            id="name"
-            placeholder="Portfolio Site"
-            required
-            aria-invalid={!!fieldErrors.name}
-            value={values.name}
-            onChange={(e) => updateField("name", e.target.value)}
-          />
-          <FieldError errors={toFieldErrorMessages(fieldErrors.name)} />
-        </Field>
+        <div className="flex flex-col gap-4">
+          <SectionLabel>Basics</SectionLabel>
 
-        <Field data-invalid={!!fieldErrors.description}>
-          <FieldLabel htmlFor="description">Description</FieldLabel>
-          <Textarea
-            id="description"
-            placeholder="What is this project?"
-            rows={3}
-            aria-invalid={!!fieldErrors.description}
-            value={values.description}
-            onChange={(e) => updateField("description", e.target.value)}
-          />
-          <FieldError errors={toFieldErrorMessages(fieldErrors.description)} />
-        </Field>
+          <Field data-invalid={!!fieldErrors.name}>
+            <FieldLabel htmlFor="name">Name</FieldLabel>
+            <Input
+              id="name"
+              placeholder="Portfolio Site"
+              required
+              aria-invalid={!!fieldErrors.name}
+              value={values.name}
+              onChange={(e) => updateField("name", e.target.value)}
+            />
+            <FieldError errors={toFieldErrorMessages(fieldErrors.name)} />
+          </Field>
 
-        <Field orientation="responsive">
-          <FieldLabel htmlFor="check_type">Check type</FieldLabel>
-          <Select
-            value={values.check_type}
-            onValueChange={(value) =>
-              updateField("check_type", value as FormState["check_type"])
-            }
-          >
-            <SelectTrigger id="check_type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="http">HTTP</SelectItem>
-              <SelectItem value="tcp">TCP port</SelectItem>
-              <SelectItem value="dns">DNS resolution</SelectItem>
-              <SelectItem value="ssl">SSL/TLS certificate</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
+          <Field data-invalid={!!fieldErrors.description}>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
+            <Textarea
+              id="description"
+              placeholder="What is this project?"
+              rows={3}
+              aria-invalid={!!fieldErrors.description}
+              value={values.description}
+              onChange={(e) => updateField("description", e.target.value)}
+            />
+            <FieldError errors={toFieldErrorMessages(fieldErrors.description)} />
+          </Field>
+        </div>
 
-        {values.check_type === "tcp" ? (
+        <Separator />
+
+        <div className="flex flex-col gap-4">
+          <SectionLabel>Health check</SectionLabel>
+
+          <Field orientation="responsive">
+            <FieldLabel htmlFor="check_type">Check type</FieldLabel>
+            <Select
+              value={values.check_type}
+              onValueChange={(value) =>
+                updateField("check_type", value as FormState["check_type"])
+              }
+            >
+              <SelectTrigger id="check_type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="http">HTTP</SelectItem>
+                <SelectItem value="tcp">TCP port</SelectItem>
+                <SelectItem value="dns">DNS resolution</SelectItem>
+                <SelectItem value="ssl">SSL/TLS certificate</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
           <Field data-invalid={!!fieldErrors.health_url}>
-            <FieldLabel htmlFor="health_url">Health check target</FieldLabel>
+            <FieldLabel htmlFor="health_url">{targetConfig.label}</FieldLabel>
             <Input
               id="health_url"
-              type="text"
-              placeholder="db.example.com:5432"
+              type={targetConfig.inputType}
+              placeholder={targetConfig.placeholder}
               required
               aria-invalid={!!fieldErrors.health_url}
               value={values.health_url}
               onChange={(e) => updateField("health_url", e.target.value)}
             />
-            <FieldDescription>
-              Enter as &quot;host:port&quot;. Only whether a TCP connection
-              can be opened is checked -- no request is sent.
-            </FieldDescription>
+            <FieldDescription>{targetConfig.description}</FieldDescription>
             <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
           </Field>
-        ) : values.check_type === "dns" ? (
-          <Field data-invalid={!!fieldErrors.health_url}>
-            <FieldLabel htmlFor="health_url">Hostname</FieldLabel>
+
+          {values.check_type === "http" && (
+            <Field orientation="responsive">
+              <FieldLabel htmlFor="method">Method</FieldLabel>
+              <Select
+                value={values.method}
+                onValueChange={(value) =>
+                  updateField("method", value as FormState["method"])
+                }
+              >
+                <SelectTrigger id="method" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET</SelectItem>
+                  <SelectItem value="POST">POST</SelectItem>
+                  <SelectItem value="HEAD">HEAD</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+
+          {values.check_type === "http" && values.method !== "GET" && (
+            <Field data-invalid={!!fieldErrors.body}>
+              <FieldLabel htmlFor="body">Request body</FieldLabel>
+              <Textarea
+                id="body"
+                placeholder='{"ping": true}'
+                rows={3}
+                aria-invalid={!!fieldErrors.body}
+                value={values.body}
+                onChange={(e) => updateField("body", e.target.value)}
+              />
+              <FieldDescription>
+                Sent with {values.method} requests. Set a Content-Type header
+                under More options if needed.
+              </FieldDescription>
+              <FieldError errors={toFieldErrorMessages(fieldErrors.body)} />
+            </Field>
+          )}
+
+          {values.check_type === "http" && (
+            <Field orientation="responsive" data-invalid={!!fieldErrors.expected_status}>
+              <FieldLabel htmlFor="expected_status">Expected status</FieldLabel>
+              <Input
+                id="expected_status"
+                type="number"
+                aria-invalid={!!fieldErrors.expected_status}
+                value={values.expected_status}
+                onChange={(e) => updateField("expected_status", Number(e.target.value))}
+              />
+              <FieldError errors={toFieldErrorMessages(fieldErrors.expected_status)} />
+            </Field>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="flex flex-col gap-4">
+          <SectionLabel>Timing &amp; reliability</SectionLabel>
+
+          <Field orientation="responsive" data-invalid={!!fieldErrors.check_interval_seconds}>
+            <FieldLabel htmlFor="check_interval_seconds">Check interval (seconds)</FieldLabel>
             <Input
-              id="health_url"
-              type="text"
-              placeholder="example.com"
-              required
-              aria-invalid={!!fieldErrors.health_url}
-              value={values.health_url}
-              onChange={(e) => updateField("health_url", e.target.value)}
+              id="check_interval_seconds"
+              type="number"
+              aria-invalid={!!fieldErrors.check_interval_seconds}
+              value={values.check_interval_seconds}
+              onChange={(e) =>
+                updateField("check_interval_seconds", Number(e.target.value))
+              }
             />
-            <FieldDescription>
-              No scheme or port. Only whether this hostname resolves is
-              checked -- no request is sent.
-            </FieldDescription>
-            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+            <FieldError
+              errors={toFieldErrorMessages(fieldErrors.check_interval_seconds)}
+            />
           </Field>
-        ) : values.check_type === "ssl" ? (
-          <Field data-invalid={!!fieldErrors.health_url}>
-            <FieldLabel htmlFor="health_url">Health check target</FieldLabel>
+
+          <Field orientation="responsive" data-invalid={!!fieldErrors.timeout_ms}>
+            <FieldLabel htmlFor="timeout_ms">Timeout (ms)</FieldLabel>
             <Input
-              id="health_url"
-              type="text"
-              placeholder="example.com:443"
-              required
-              aria-invalid={!!fieldErrors.health_url}
-              value={values.health_url}
-              onChange={(e) => updateField("health_url", e.target.value)}
+              id="timeout_ms"
+              type="number"
+              aria-invalid={!!fieldErrors.timeout_ms}
+              value={values.timeout_ms}
+              onChange={(e) => updateField("timeout_ms", Number(e.target.value))}
             />
-            <FieldDescription>
-              Enter as &quot;host:port&quot;. Checks the certificate is
-              valid and not expiring soon -- no request is sent.
-            </FieldDescription>
-            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
+            <FieldError errors={toFieldErrorMessages(fieldErrors.timeout_ms)} />
           </Field>
-        ) : (
-          <Field data-invalid={!!fieldErrors.health_url}>
-            <FieldLabel htmlFor="health_url">Health check URL</FieldLabel>
-            <Input
-              id="health_url"
-              type="url"
-              placeholder="https://your-app.example.com/health"
-              required
-              aria-invalid={!!fieldErrors.health_url}
-              value={values.health_url}
-              onChange={(e) => updateField("health_url", e.target.value)}
-            />
-            <FieldDescription>
-              Must use https://
-              {process.env.NODE_ENV !== "production" &&
-                ", or http://localhost while developing"}
-              .
-            </FieldDescription>
-            <FieldError errors={toFieldErrorMessages(fieldErrors.health_url)} />
-          </Field>
-        )}
+        </div>
 
         <Accordion type="single" collapsible>
           <AccordionItem value="advanced">
             <AccordionTrigger className="text-sm text-muted-foreground">
-              Advanced settings
+              More options
             </AccordionTrigger>
             <AccordionContent>
               <FieldGroup>
-                {values.check_type === "http" && (
-                  <Field orientation="responsive">
-                    <FieldLabel htmlFor="method">Method</FieldLabel>
-                    <Select
-                      value={values.method}
-                      onValueChange={(value) =>
-                        updateField("method", value as FormState["method"])
-                      }
-                    >
-                      <SelectTrigger id="method" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GET">GET</SelectItem>
-                        <SelectItem value="POST">POST</SelectItem>
-                        <SelectItem value="HEAD">HEAD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-
-                {values.check_type === "http" && values.method !== "GET" && (
-                  <Field data-invalid={!!fieldErrors.body}>
-                    <FieldLabel htmlFor="body">Request body</FieldLabel>
-                    <Textarea
-                      id="body"
-                      placeholder='{"ping": true}'
-                      rows={3}
-                      aria-invalid={!!fieldErrors.body}
-                      value={values.body}
-                      onChange={(e) => updateField("body", e.target.value)}
-                    />
-                    <FieldDescription>
-                      Sent with {values.method} requests. Set a Content-Type
-                      header below if needed.
-                    </FieldDescription>
-                    <FieldError errors={toFieldErrorMessages(fieldErrors.body)} />
-                  </Field>
-                )}
-
-                {values.check_type === "http" && (
-                  <Field
-                    orientation="responsive"
-                    data-invalid={!!fieldErrors.expected_status}
-                  >
-                    <FieldLabel htmlFor="expected_status">
-                      Expected status
-                    </FieldLabel>
-                    <Input
-                      id="expected_status"
-                      type="number"
-                      aria-invalid={!!fieldErrors.expected_status}
-                      value={values.expected_status}
-                      onChange={(e) =>
-                        updateField("expected_status", Number(e.target.value))
-                      }
-                    />
-                    <FieldError
-                      errors={toFieldErrorMessages(fieldErrors.expected_status)}
-                    />
-                  </Field>
-                )}
-
-                <Field
-                  orientation="responsive"
-                  data-invalid={!!fieldErrors.check_interval_seconds}
-                >
-                  <FieldLabel htmlFor="check_interval_seconds">
-                    Check interval (seconds)
-                  </FieldLabel>
-                  <Input
-                    id="check_interval_seconds"
-                    type="number"
-                    aria-invalid={!!fieldErrors.check_interval_seconds}
-                    value={values.check_interval_seconds}
-                    onChange={(e) =>
-                      updateField(
-                        "check_interval_seconds",
-                        Number(e.target.value),
-                      )
-                    }
-                  />
-                  <FieldError
-                    errors={toFieldErrorMessages(
-                      fieldErrors.check_interval_seconds,
-                    )}
-                  />
-                </Field>
-
-                <Field
-                  orientation="responsive"
-                  data-invalid={!!fieldErrors.timeout_ms}
-                >
-                  <FieldLabel htmlFor="timeout_ms">Timeout (ms)</FieldLabel>
-                  <Input
-                    id="timeout_ms"
-                    type="number"
-                    aria-invalid={!!fieldErrors.timeout_ms}
-                    value={values.timeout_ms}
-                    onChange={(e) =>
-                      updateField("timeout_ms", Number(e.target.value))
-                    }
-                  />
-                  <FieldError
-                    errors={toFieldErrorMessages(fieldErrors.timeout_ms)}
-                  />
-                </Field>
-
                 <Field orientation="responsive">
                   <FieldLabel htmlFor="hosting_provider">
                     Hosting provider

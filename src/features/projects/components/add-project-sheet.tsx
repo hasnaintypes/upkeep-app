@@ -62,7 +62,7 @@ export function AddProjectSheet({
               : "Register a project's health endpoint to start monitoring it."}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
           {!isEditing && (
             <ImportSection
               onComplete={(created) => {
