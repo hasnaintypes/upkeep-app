@@ -36,6 +36,31 @@ export const WAKING_THRESHOLD_MS = 7000;
  * "degraded" rather than "up". */
 export const DEGRADED_THRESHOLD_MS = 3000;
 
+/**
+ * Builds the `response_snippet` value from a check's raw body text. Health
+ * endpoints are expected to return a short plaintext/JSON body -- a
+ * `text/html` response almost always means the URL is pointed at a normal
+ * app page (an error page, a login redirect, a misconfigured health-check
+ * path) rather than a real health endpoint, and dumping a truncated slice
+ * of that page's markup into the snippet is useless (worse, confusing --
+ * see the check-log table's "View response snippet" disclosure, which
+ * renders this verbatim). So an HTML content type gets a short descriptive
+ * placeholder instead of the markup itself; every other content type keeps
+ * the existing truncate-to-RESPONSE_SNIPPET_MAX_LENGTH behavior, since
+ * `expected_body_match`/JSON-path assertions still need the *full*
+ * `bodyText` (checked separately in `runHttpCheck`, not against this
+ * snippet).
+ */
+function buildResponseSnippet(bodyText: string, contentType: string | null): string | null {
+  if (!bodyText) {
+    return null;
+  }
+  if (contentType?.toLowerCase().includes("text/html")) {
+    return `[HTML response omitted from snippet -- ${bodyText.length} characters, content-type: ${contentType}]`;
+  }
+  return bodyText.slice(0, RESPONSE_SNIPPET_MAX_LENGTH) || null;
+}
+
 function toHeaderRecord(headers: unknown): Record<string, string> {
   if (!headers || typeof headers !== "object" || Array.isArray(headers)) {
     return {};
@@ -100,7 +125,7 @@ export async function runHttpCheck(project: DueProject): Promise<CheckResult> {
       project_id: project.id,
       http_status: response.status,
       response_time_ms: responseTimeMs,
-      response_snippet: bodyText.slice(0, RESPONSE_SNIPPET_MAX_LENGTH) || null,
+      response_snippet: buildResponseSnippet(bodyText, response.headers.get("content-type")),
       error_message: null,
       timed_out: false,
       attempts: 1,

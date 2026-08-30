@@ -203,6 +203,90 @@ Deno.test("runHttpCheck: expected_json_path/value unset -> jsonAssertionFailed a
   }
 });
 
+// --- response_snippet / HTML content-type handling --------------------------
+
+Deno.test("runHttpCheck: text/html content-type -> response_snippet is a placeholder, not the raw markup", async () => {
+  const originalFetch = globalThis.fetch;
+  const html = "<html><body><h1>Not Found</h1></body></html>";
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(html, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } }),
+    )) as typeof fetch;
+
+  try {
+    const result = await runHttpCheck(fakeProject());
+    assertEquals(result.response_snippet?.includes("<html>"), false);
+    assertEquals(result.response_snippet?.includes("HTML response omitted"), true);
+    assertEquals(result.response_snippet?.includes(`${html.length} characters`), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHttpCheck: text/html content-type -> expected_body_match is still checked against the full raw body", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response("<html>all systems healthy</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    )) as typeof fetch;
+
+  try {
+    const result = await runHttpCheck(fakeProject({ expected_body_match: "all systems healthy" }));
+    // The assertion result proves the match ran against the full HTML body
+    // even though response_snippet itself was replaced with a placeholder.
+    assertEquals(result.bodyMatchFailed, false);
+    assertEquals(result.response_snippet?.includes("HTML response omitted"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHttpCheck: non-HTML content-type (application/json) -> response_snippet keeps the existing truncated-body behavior", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ status: "ok" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    )) as typeof fetch;
+
+  try {
+    const result = await runHttpCheck(fakeProject());
+    assertEquals(result.response_snippet, JSON.stringify({ status: "ok" }));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHttpCheck: no content-type header -> response_snippet keeps the existing truncated-body behavior", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.resolve(new Response("plain text body", { status: 200 }))) as typeof fetch;
+
+  try {
+    const result = await runHttpCheck(fakeProject());
+    assertEquals(result.response_snippet, "plain text body");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("runHttpCheck: empty body with text/html content-type -> response_snippet is null, not a placeholder", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response("", { status: 200, headers: { "content-type": "text/html" } }))) as typeof fetch;
+
+  try {
+    const result = await runHttpCheck(fakeProject());
+    assertEquals(result.response_snippet, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("runHttpCheck: expected_json_path set but expected_json_value unset -> treated as not configured", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (() =>
