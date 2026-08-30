@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { SirenIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CursorPagination } from "@/components/data-table/cursor-pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -72,11 +70,11 @@ export function GlobalIncidentTable({
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 px-4 sm:px-6">
+    <div className="flex flex-col gap-4">
+      <div className="overflow-hidden rounded-lg border">
         <Table>
-          <TableHeader>
-            <TableRow>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent">
               <TableHead>Project</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Started</TableHead>
@@ -97,23 +95,13 @@ export function GlobalIncidentTable({
             ))}
           </TableBody>
         </Table>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" disabled={!page.hasPrevious} asChild={page.hasPrevious}>
-            {page.hasPrevious ? (
-              <Link href={pageHref(filters, rows[0].started_at, "previous")}>Newer</Link>
-            ) : (
-              <span>Newer</span>
-            )}
-          </Button>
-          <Button variant="outline" size="sm" disabled={!page.hasNext} asChild={page.hasNext}>
-            {page.hasNext ? (
-              <Link href={pageHref(filters, rows[rows.length - 1].started_at, "next")}>Older</Link>
-            ) : (
-              <span>Older</span>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      <CursorPagination
+        hasPrevious={page.hasPrevious}
+        hasNext={page.hasNext}
+        previousHref={pageHref(filters, rows[0].started_at, "previous")}
+        nextHref={pageHref(filters, rows[rows.length - 1].started_at, "next")}
+      />
+    </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { SirenIcon } from "lucide-react";
+import { CursorPagination } from "@/components/data-table/cursor-pagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineEmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -53,49 +54,38 @@ export function IncidentHistoryTable({
       </CardHeader>
       <CardContent className="flex flex-col gap-4 px-4 sm:px-6">
         {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No incidents recorded yet.</p>
+          <InlineEmptyState
+            icon={SirenIcon}
+            title="No incidents yet"
+            description="This project hasn't had any downtime -- incidents show up here automatically once detected."
+          />
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead className="hidden sm:table-cell">Resolved</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead className="text-right sr-only">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((incident) => (
-                  <IncidentRow key={incident.id} incident={incident} onSaved={handleSaved} />
-                ))}
-              </TableBody>
-            </Table>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!page.hasPrevious}
-                asChild={page.hasPrevious}
-              >
-                {page.hasPrevious ? (
-                  <Link href={pageHref(projectId, rows[0].started_at, "previous")}>Newer</Link>
-                ) : (
-                  <span>Newer</span>
-                )}
-              </Button>
-              <Button variant="outline" size="sm" disabled={!page.hasNext} asChild={page.hasNext}>
-                {page.hasNext ? (
-                  <Link href={pageHref(projectId, rows[rows.length - 1].started_at, "next")}>
-                    Older
-                  </Link>
-                ) : (
-                  <span>Older</span>
-                )}
-              </Button>
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead className="hidden sm:table-cell">Resolved</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="text-right sr-only">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((incident) => (
+                    <IncidentRow key={incident.id} incident={incident} onSaved={handleSaved} />
+                  ))}
+                </TableBody>
+              </Table>
             </div>
+            <CursorPagination
+              hasPrevious={page.hasPrevious}
+              hasNext={page.hasNext}
+              previousHref={pageHref(projectId, rows[0].started_at, "previous")}
+              nextHref={pageHref(projectId, rows[rows.length - 1].started_at, "next")}
+            />
           </>
         )}
       </CardContent>

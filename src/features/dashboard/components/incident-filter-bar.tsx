@@ -14,10 +14,11 @@ const STATUS_OPTIONS = [
 /**
  * Filter bar for the global incident view (PRD §5.4, Phase 5, #39):
  * project, status (open/resolved), and time-range, each a single-select
- * (see `IncidentFilterSelect`'s own doc comment for why these use `Select`
- * instead of the overview page's toggle chips, #33). Filter state lives
- * entirely in the URL (`parseGlobalIncidentFilters`/`incidentFilterHref` in
- * lib/incident-filters.ts) -- same convention as `OverviewFilterBar`.
+ * (see `IncidentFilterSelect`'s own doc comment for why these use `Select`).
+ * Filter state lives entirely in the URL (`parseGlobalIncidentFilters`/
+ * `incidentFilterHref` in lib/incident-filters.ts) -- see that module's own
+ * doc comment for why this stays URL-driven even though the overview
+ * page's table filters are now plain client state.
  */
 export function IncidentFilterBar({
   filters,

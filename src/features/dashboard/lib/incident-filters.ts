@@ -10,10 +10,13 @@ const VALID_TIME_RANGES: ReadonlySet<string> = new Set(["24h", "7d", "30d", "90d
 
 /**
  * Global incident view filter state (PRD §5.4, Phase 5, #39), parsed from
- * URL query params -- same "the URL is the only source of truth, no
- * client-side filter state that isn't also reflected there" convention as
- * the overview page's `parseOverviewFilters` (#33), so a filtered/paginated
- * view stays shareable/bookmarkable/refresh-safe.
+ * URL query params -- "the URL is the only source of truth, no client-side
+ * filter state that isn't also reflected there", so a filtered/paginated
+ * view stays shareable/bookmarkable/refresh-safe. Deliberately kept this
+ * way even though the overview page's own table filters moved to plain
+ * client state (#29/#33) -- unlike that already fully-fetched, bounded
+ * list, incident history is itself server-paginated, so the filters have
+ * to be real query params the server-side query can read.
  */
 export function parseGlobalIncidentFilters(
   searchParams: GlobalIncidentSearchParams,
