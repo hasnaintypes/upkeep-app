@@ -15,41 +15,7 @@ import {
   OverviewStats,
   OverviewTable,
   PortfolioIncidentsChart,
-  type PortfolioIncidentDailyPoint,
 } from "@/features/dashboard";
-
-/**
- * TEMPORARY -- landing-page screenshot only. Real portfolios rarely have
- * enough incident history yet to make this chart look like anything on a
- * fresh screenshot; this hardcodes a plausible-looking 30-day
- * opened/resolved pattern instead. `getPortfolioIncidentDailyCounts()` is
- * still called below (its error is still checked, same as before) -- only
- * its `data` is left unused, and only `PortfolioIncidentsChart`'s own
- * `points` prop is swapped out.
- *
- * TO REVERT: delete this function and its two `DUMMY_*` arrays, re-add
- * `data: incidentDailyCounts` to the destructure below, and change
- * `PortfolioIncidentsChart`'s `points` prop back to
- * `incidentDailyCounts ?? []`.
- */
-const DUMMY_OPENED = [
-  1, 0, 2, 1, 0, 0, 3, 2, 1, 0, 1, 4, 2, 0, 1, 0, 2, 3, 1, 0, 0, 1, 2, 0, 3, 1, 0, 2, 1, 0,
-];
-const DUMMY_RESOLVED = [
-  0, 1, 1, 2, 0, 0, 2, 3, 1, 1, 0, 3, 3, 1, 0, 1, 1, 2, 2, 1, 0, 0, 2, 1, 2, 2, 1, 1, 2, 0,
-];
-function buildDummyIncidentDailyCounts(): PortfolioIncidentDailyPoint[] {
-  const days = DUMMY_OPENED.length;
-  return Array.from({ length: days }, (_, i) => {
-    const date = new Date();
-    date.setUTCDate(date.getUTCDate() - (days - 1 - i));
-    return {
-      day: date.toISOString().slice(0, 10),
-      opened: DUMMY_OPENED[i],
-      resolved: DUMMY_RESOLVED[i],
-    };
-  });
-}
 
 /**
  * Dashboard overview page (PRD §5.6, Phase 4, issues #29 and #33): every
@@ -87,11 +53,7 @@ async function OverviewLoader() {
     { data: projects, error: projectsError },
     { data: summaries, error: summaryError },
     { data: openIncidents, error: incidentError },
-    // `data` (the real 30-day counts) is intentionally unused for now --
-    // see `buildDummyIncidentDailyCounts`'s doc comment above. The query
-    // still runs and its error is still checked below, so reverting this
-    // is just re-adding `data: incidentDailyCounts` here.
-    { error: incidentDailyError },
+    { data: incidentDailyCounts, error: incidentDailyError },
   ] = await Promise.all([
     getActiveProjects(),
     getProjectUptimeSummaries(),
@@ -151,8 +113,7 @@ async function OverviewLoader() {
 
       <div className="flex flex-col gap-4">
         <SectionLabel>Activity</SectionLabel>
-        {/* TEMP: swapped for dummy data, see buildDummyIncidentDailyCounts's own doc comment above */}
-        <PortfolioIncidentsChart points={buildDummyIncidentDailyCounts()} />
+        <PortfolioIncidentsChart points={incidentDailyCounts ?? []} />
       </div>
 
       <div className="flex flex-col gap-4">
