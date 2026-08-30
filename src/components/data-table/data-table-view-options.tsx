@@ -41,12 +41,12 @@ export function DataTableViewOptions<TData extends RowData>({
           .map((column) => (
             <DropdownMenuCheckboxItem
               key={column.id}
-              className="capitalize"
+              className={column.columnDef.meta?.label ? undefined : "capitalize"}
               checked={column.getIsVisible()}
               onCheckedChange={(value) => column.toggleVisibility(!!value)}
               onSelect={(event) => event.preventDefault()}
             >
-              {column.id}
+              {column.columnDef.meta?.label ?? column.id}
             </DropdownMenuCheckboxItem>
           ))}
       </DropdownMenuContent>

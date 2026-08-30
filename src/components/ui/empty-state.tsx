@@ -44,3 +44,38 @@ export function EmptyState({
     </Card>
   );
 }
+
+/**
+ * Lighter-weight "nothing here yet" placeholder for composing *inside* an
+ * already-titled section (e.g. a table's own `Card`/`CardHeader`), where
+ * the full `EmptyState` above would double up on chrome -- it owns its own
+ * `Card`, full-section height, and larger icon, which reads oddly nested
+ * inside a section that already has a heading. This is just the icon +
+ * message, sized to sit inside an existing `CardContent` instead of
+ * replacing it.
+ */
+export function InlineEmptyState({
+  icon: Icon,
+  title,
+  description,
+  className,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col items-center gap-3 py-10 text-center", className)}>
+      <div className="flex size-11 items-center justify-center rounded-full bg-muted">
+        <Icon className="size-5 text-muted-foreground" />
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <p className="text-sm font-medium">{title}</p>
+        {description && (
+          <p className="max-w-xs text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+    </div>
+  );
+}

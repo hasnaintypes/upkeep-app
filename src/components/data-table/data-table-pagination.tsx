@@ -26,14 +26,20 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
  * `dataTableFeatures` (see `DataTable`). */
 export function DataTablePagination<TData extends RowData>({
   table,
+  showSelectionCount = true,
 }: {
   table: TanstackTable<DataTableFeatures, TData>;
+  /** Set to `false` for tables with no row-selection column -- the count
+   * would always read "0 of N selected" with no way to change it, which is
+   * dead/misleading UI rather than a useful summary (e.g. `ApiKeyTable`,
+   * which has no bulk actions to select rows for). */
+  showSelectionCount?: boolean;
 }) {
   return (
     <div className="flex flex-col-reverse items-center justify-between gap-4 sm:flex-row">
       <div className="text-sm text-muted-foreground">
-        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-        {table.getFilteredRowModel().rows.length} row(s) selected.
+        {showSelectionCount &&
+          `${table.getFilteredSelectedRowModel().rows.length} of ${table.getFilteredRowModel().rows.length} row(s) selected.`}
       </div>
       <div className="flex w-full flex-col-reverse items-center gap-4 sm:w-fit sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center gap-2">

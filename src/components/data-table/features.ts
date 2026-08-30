@@ -20,12 +20,30 @@ import {
   createFilteredRowModel,
   createPaginatedRowModel,
   createSortedRowModel,
+  metaHelper,
   rowPaginationFeature,
   rowSelectionFeature,
   rowSortingFeature,
   tableFeatures,
   type RowData,
 } from "@tanstack/react-table";
+
+/** Extra classes a column can ask `DataTable` to merge onto its own
+ * `<TableHead>`/`<TableCell>` -- the shared shell has no other way to take
+ * per-column layout opinions (e.g. responsive hiding on narrow viewports,
+ * right-alignment for a numeric column) since it only knows how to render
+ * whatever `FlexRender` produces for the cell's *content*, not the
+ * surrounding table elements themselves. */
+export type DataTableColumnMeta = {
+  headerClassName?: string;
+  cellClassName?: string;
+  /** Human-readable name for `DataTableViewOptions`' "Customize columns"
+   * dropdown -- falls back to the raw column `id` (e.g. "uptime_7d") when
+   * omitted, which reads fine for a table whose column ids already are
+   * their display names, but not for one like the overview table's
+   * `uptime_7d`/`lastChecked`. */
+  label?: string;
+};
 
 export const dataTableFeatures = tableFeatures({
   columnFilteringFeature,
@@ -36,6 +54,7 @@ export const dataTableFeatures = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
   sortedRowModel: createSortedRowModel(),
+  columnMeta: metaHelper<DataTableColumnMeta>(),
 });
 
 export type DataTableFeatures = typeof dataTableFeatures;

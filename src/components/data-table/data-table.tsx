@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import type { DataTableFeatures } from "./features";
 import { DataTablePagination } from "./data-table-pagination";
 
@@ -34,11 +35,14 @@ export function DataTable<TData extends RowData>({
   columnCount,
   emptyMessage = "No results.",
   hidePagination = false,
+  showSelectionCount = true,
 }: {
   table: TanstackTable<DataTableFeatures, TData>;
   columnCount: number;
   emptyMessage?: string;
   hidePagination?: boolean;
+  /** Forwarded to `DataTablePagination` -- see its own doc comment. */
+  showSelectionCount?: boolean;
 }) {
   const rows = table.getRowModel().rows;
 
@@ -50,7 +54,11 @@ export function DataTable<TData extends RowData>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} colSpan={header.colSpan}>
+                  <TableHead
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    className={cn(header.column.columnDef.meta?.headerClassName)}
+                  >
                     {header.isPlaceholder ? null : <FlexRender header={header} />}
                   </TableHead>
                 ))}
@@ -62,7 +70,10 @@ export function DataTable<TData extends RowData>({
               rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={cn(cell.column.columnDef.meta?.cellClassName)}
+                    >
                       <FlexRender cell={cell} />
                     </TableCell>
                   ))}
@@ -78,7 +89,9 @@ export function DataTable<TData extends RowData>({
           </TableBody>
         </Table>
       </div>
-      {!hidePagination && <DataTablePagination table={table} />}
+      {!hidePagination && (
+        <DataTablePagination table={table} showSelectionCount={showSelectionCount} />
+      )}
     </div>
   );
 }

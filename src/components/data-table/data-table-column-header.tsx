@@ -1,78 +1,22 @@
-"use client";
-
-import { ArrowDown, ArrowUp, ChevronsUpDown, EyeOff } from "lucide-react";
 import type { Column, RowData } from "@tanstack/react-table";
 
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { DataTableFeatures } from "./features";
 
-/** Sortable, hideable column header button -- the standard shadcn
- * data-table pattern (asc/desc/hide in a dropdown, with a chevron icon
- * reflecting the current sort direction). For a column that can't sort or
- * hide, this just renders `title` as plain text -- callers don't need a
- * separate header renderer for non-sortable columns. */
+/**
+ * Plain-label column header -- every data table in this app renders its
+ * headers this way, with no per-column sort affordance (no asc/desc toggle,
+ * no chevron icon). Column hiding lives entirely in `DataTableViewOptions`'
+ * "Customize columns" dropdown instead of being duplicated per-header, so
+ * this component has nothing left to be interactive about; it takes `column`
+ * only to keep every existing column-definition callsite unchanged.
+ */
 export function DataTableColumnHeader<TData extends RowData, TValue>({
-  column,
   title,
   className,
 }: {
-  column: Column<DataTableFeatures, TData, TValue>;
+  column?: Column<DataTableFeatures, TData, TValue>;
   title: string;
   className?: string;
 }) {
-  if (!column.getCanSort()) {
-    return <div className={className}>{title}</div>;
-  }
-
-  const sorted = column.getIsSorted();
-
-  return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 data-[state=open]:bg-accent"
-          >
-            <span>{title}</span>
-            {sorted === "desc" ? (
-              <ArrowDown />
-            ) : sorted === "asc" ? (
-              <ArrowUp />
-            ) : (
-              <ChevronsUpDown />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
-            <ArrowUp className="text-muted-foreground/70" />
-            Asc
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
-            <ArrowDown className="text-muted-foreground/70" />
-            Desc
-          </DropdownMenuItem>
-          {column.getCanHide() && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
-                <EyeOff className="text-muted-foreground/70" />
-                Hide
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
+  return <div className={className}>{title}</div>;
 }
