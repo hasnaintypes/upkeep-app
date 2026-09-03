@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, UploadCloud, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,7 +162,15 @@ export function ImportSection({
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium">Import from a file</span>
             <span className="text-xs text-muted-foreground">
-              Upload a <code>.csv</code> or <code>.json</code> file to add multiple projects at once.
+              Upload a <code>.csv</code> or <code>.json</code> file to add multiple projects at once.{" "}
+              <Link
+                href="/docs/projects#bulk-import"
+                target="_blank"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                See the file format
+              </Link>
+              .
             </span>
           </div>
         </div>
