@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOutIcon, MoreVerticalIcon, SettingsIcon, UserIcon } from "lucide-react";
+import { LogOutIcon, MoreVerticalIcon, SettingsIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -29,6 +28,7 @@ import {
 import { AUTH_ROUTES } from "@/features/auth/constants/routes";
 import { signOut } from "@/features/auth/lib/actions";
 import { notify } from "@/lib/toast";
+import { useSettingsDialog } from "@/components/layout/settings-dialog";
 
 /** First letter of the email, uppercased -- there's no display name/avatar
  * upload feature in this app, so an initial is the only thing to show
@@ -39,16 +39,18 @@ function initialFor(email: string) {
 
 /**
  * Sidebar footer user menu (adapted from dashboard-01's nav-user.tsx):
- * avatar-initial + email + a dropdown with "Account" (/dashboard/account)
- * and "Settings" (/dashboard/settings) above a separator, then "Log out"
- * -- wired to the existing `signOut()` client action
- * (features/auth/lib/actions.ts), the same one `LogoutButton` uses. The
- * block's own version also has a "Billing" item; that's not included here
- * since there's no billing feature in this app (no fake menu items).
+ * avatar-initial + email + a dropdown with "Settings" (opens the settings
+ * dialog -- Appearance/Account/Notifications in one place, see
+ * settings-dialog.tsx) above a separator, then "Log out" -- wired to the
+ * existing `signOut()` client action (features/auth/lib/actions.ts), the
+ * same one `LogoutButton` uses. The block's own version also has a
+ * "Billing" item; that's not included here since there's no billing
+ * feature in this app (no fake menu items).
  */
 export function NavUser({ email }: { email: string }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const openSettings = useSettingsDialog();
 
   async function handleLogout() {
     const { error } = await signOut();
@@ -92,17 +94,9 @@ export function NavUser({ email }: { email: string }) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/account">
-                <UserIcon />
-                Account
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/dashboard/settings">
-                <SettingsIcon />
-                Settings
-              </Link>
+            <DropdownMenuItem onClick={() => openSettings()}>
+              <SettingsIcon />
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

@@ -49,7 +49,7 @@ export function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
 
       const { error } = await updateEmail(
         newEmail.trim(),
-        `${window.location.origin}/dashboard/account`,
+        `${window.location.origin}/dashboard`,
       );
       if (error) {
         setError(error.message);

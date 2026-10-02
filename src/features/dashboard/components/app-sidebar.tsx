@@ -7,6 +7,7 @@ import {
   FolderIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
+  ServerIcon,
   SirenIcon,
 } from "lucide-react";
 import {
@@ -25,6 +26,7 @@ const NAV_MAIN_ITEMS: NavMainItem[] = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Projects", url: "/dashboard/projects", icon: FolderIcon },
   { title: "Incidents", url: "/dashboard/incidents", icon: SirenIcon },
+  { title: "Hosting Accounts", url: "/dashboard/hosting-accounts", icon: ServerIcon },
   { title: "API Keys", url: "/dashboard/api-keys", icon: KeyRoundIcon },
 ];
 

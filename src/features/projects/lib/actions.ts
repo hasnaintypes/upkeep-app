@@ -1,10 +1,55 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { intervalSecondsFromBudget, keepAliveIntervalMinutesFromBudget } from "@/features/platform-accounts";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/types";
 import type { ProjectActionResult } from "../types";
 import { dnsTargetSchema, healthUrlSchema, tcpTargetSchema } from "./validation";
 import { type HeaderMap, maskProjectHeaders, mergeHeaders } from "./headers";
+
+/**
+ * When a project is attached to a platform account (`platform_account_id` present in the
+ * input), the budget fields it carries are the source of truth for scheduling, not whatever
+ * `check_interval_seconds`/`keep_alive_interval_minutes` the caller also sent -- re-derives both
+ * from the account's own `assumed_ms_per_request` server-side (never trusts a client-computed
+ * interval, same reasoning as `validateHealthUrl` below never trusting client-side format
+ * checks alone) and auto-syncs `hosting_provider` from the account's platform name so the
+ * existing dashboard provider filter keeps working. A project not attached to any account
+ * (`platform_account_id` absent/null) is untouched by this -- manual interval entry, exactly as
+ * before this feature existed (docs/ROADMAP.md Phase 12).
+ */
+async function applyPlatformBudget<
+  T extends Partial<TablesInsert<"projects">>,
+>(supabase: Awaited<ReturnType<typeof createClient>>, input: T): Promise<T> {
+  if (!input.platform_account_id) return input;
+
+  const { data: account, error } = await supabase
+    .from("platform_accounts")
+    .select("assumed_ms_per_request, hosting_platforms(name)")
+    .eq("id", input.platform_account_id)
+    .single();
+
+  // A missing/foreign account id (RLS hides anyone else's row) falls through unchanged --
+  // the insert/update below will fail on its own foreign key constraint instead of silently
+  // skipping the budget derivation.
+  if (error || !account) return input;
+
+  const next: T = { ...input, hosting_provider: account.hosting_platforms?.name ?? input.hosting_provider };
+
+  if (input.budget_minutes_per_month != null) {
+    next.check_interval_seconds = intervalSecondsFromBudget(
+      input.budget_minutes_per_month,
+      account.assumed_ms_per_request,
+    );
+  }
+  if (input.keep_alive_enabled && input.keep_alive_budget_minutes_per_month != null) {
+    next.keep_alive_interval_minutes = keepAliveIntervalMinutesFromBudget(
+      input.keep_alive_budget_minutes_per_month,
+      account.assumed_ms_per_request,
+    );
+  }
+  return next;
+}
 
 /**
  * Re-validates `health_url` server-side against whichever format its
@@ -75,9 +120,13 @@ export async function createProject(
   }
 
   const supabase = await createClient();
+  const insertInput = await applyPlatformBudget(supabase, {
+    ...input,
+    health_url: healthUrlResult.data,
+  });
   const { data, error } = await supabase
     .from("projects")
-    .insert({ ...input, health_url: healthUrlResult.data })
+    .insert(insertInput)
     .select()
     .single();
 
@@ -152,9 +201,10 @@ export async function updateProject(
     input = { ...input, health_url: healthUrlResult.data };
   }
 
+  const updateInput = await applyPlatformBudget(supabase, input);
   const { data, error } = await supabase
     .from("projects")
-    .update(input)
+    .update(updateInput)
     .eq("id", id)
     .select()
     .single();

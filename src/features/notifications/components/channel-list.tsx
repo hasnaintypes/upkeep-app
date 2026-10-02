@@ -13,15 +13,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { EmptyState } from "@/components/ui/empty-state";
+import { InlineEmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +55,8 @@ const CHANNEL_TYPE_ICON: Record<NotificationChannelType, typeof BellIcon> = {
  * Manages the current user's notification channels (create, edit config,
  * toggle active, delete) -- the prerequisite this issue's own acceptance
  * criteria assume ("attach one or more *existing* notification_channels to
- * a project"). Rendered on /dashboard/settings; the per-project rules
+ * a project"). Rendered in the Notifications section of the settings
+ * dialog (components/layout/settings-dialog.tsx); the per-project rules
  * panel (project-notification-rules.tsx) only picks from what's created
  * here, it doesn't create channels itself.
  */
@@ -156,70 +150,71 @@ export function ChannelList({
       {toggleError && <p className="text-sm text-destructive">{toggleError}</p>}
 
       {channels.length === 0 ? (
-        <EmptyState
+        <InlineEmptyState
           icon={BellIcon}
           title="No notification channels yet"
           description="Add a channel here, then attach it to a project from that project's page."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="divide-y">
           {channels.map((channel) => {
             const Icon = CHANNEL_TYPE_ICON[channel.type as NotificationChannelType];
             return (
-            <Card
-              key={channel.id}
-              className={cn(!channel.is_active && "opacity-60")}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                      <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <CardTitle className="text-base">
+              <div
+                key={channel.id}
+                className={cn(
+                  "flex items-center justify-between gap-4 py-3",
+                  !channel.is_active && "opacity-60",
+                )}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">
                         {NOTIFICATION_CHANNEL_TYPE_LABELS[channel.type as NotificationChannelType]}
-                      </CardTitle>
+                      </p>
                       {!channel.is_active && (
-                        <Badge variant="secondary" className="w-fit text-[10px]">
+                        <Badge variant="secondary" className="text-[10px]">
                           Inactive
                         </Badge>
                       )}
                     </div>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {describeChannelConfig(channel)}
+                    </p>
                   </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
                   <Switch
                     aria-label={channel.is_active ? "Deactivate channel" : "Activate channel"}
                     checked={channel.is_active}
                     disabled={pendingId === channel.id}
                     onCheckedChange={() => handleToggleActive(channel)}
                   />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Edit channel"
+                    onClick={() => setEditingChannel(channel)}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Delete channel"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeletingChannel(channel);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
-                <CardDescription className="truncate">
-                  {describeChannelConfig(channel)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Edit channel"
-                  onClick={() => setEditingChannel(channel)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Delete channel"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeletingChannel(channel);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </CardContent>
-            </Card>
+              </div>
             );
           })}
         </div>

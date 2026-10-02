@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { BellOff, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { notify } from "@/lib/toast";
+import { useSettingsDialog } from "@/components/layout/settings-dialog";
 import {
   createNotificationRule,
   deleteNotificationRule,
@@ -65,6 +65,7 @@ export function ProjectNotificationRules({
 }) {
   const [rules, setRules] = useState(initialRules);
   const [selectedChannelId, setSelectedChannelId] = useState("");
+  const openSettings = useSettingsDialog();
   const [newThreshold, setNewThreshold] = useState(String(DEFAULT_ESCALATION_THRESHOLD));
   const [attachError, setAttachError] = useState<string | null>(null);
   const [isAttaching, setIsAttaching] = useState(false);
@@ -342,9 +343,13 @@ export function ProjectNotificationRules({
         {allChannels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No notification channels configured yet.{" "}
-            <Link href="/dashboard/settings" className="underline underline-offset-4">
+            <button
+              type="button"
+              onClick={() => openSettings("notifications")}
+              className="underline underline-offset-4"
+            >
               Add one
-            </Link>{" "}
+            </button>{" "}
             to start alerting on this project&apos;s status.
           </p>
         ) : unattachedChannels.length === 0 ? (

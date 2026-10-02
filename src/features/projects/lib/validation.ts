@@ -222,6 +222,17 @@ export const createProjectSchema = z.object({
   // is_project_publicly_visible() security definer functions, not this
   // schema -- see supabase/migrations/*_add_public_status_pages.sql.
   is_public: z.boolean().optional(),
+  // Platform Usage Budgets (docs/ROADMAP.md Phase 12) -- when
+  // platform_account_id is set, the *_budget_minutes_per_month fields drive
+  // check_interval_seconds/keep_alive_interval_minutes, recomputed
+  // authoritatively server-side (createProject/updateProject's
+  // applyPlatformBudget), never trusted from whatever the client's own live
+  // preview showed. Null (not omitted) is the explicit "detach from any
+  // account, size the interval manually" state -- matching
+  // platform_account_id's own nullable FK.
+  platform_account_id: z.string().uuid().nullable().optional(),
+  budget_minutes_per_month: z.coerce.number().int().positive().nullable().optional(),
+  keep_alive_budget_minutes_per_month: z.coerce.number().int().positive().nullable().optional(),
 }).superRefine((values, ctx) => {
   const checkType = values.check_type ?? "http";
   // ssl reuses tcpTargetSchema as-is -- same "host:port" format, see
@@ -303,4 +314,7 @@ export const createProjectFormDefaults: CreateProjectFormValues = {
   keep_alive_window_end: null,
   keep_alive_timezone: null,
   is_public: PROJECT_DEFAULTS.isPublic,
+  platform_account_id: null,
+  budget_minutes_per_month: null,
+  keep_alive_budget_minutes_per_month: null,
 };

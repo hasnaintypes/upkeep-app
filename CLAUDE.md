@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Upkeep — a self-hosted uptime/health monitor for personal projects on free-tier hosts. The product spec lives in `docs/PRD.md` (gitignored, local-only — read it for feature scope and data model before building backend features). Currently only the Next.js frontend (marketing site + Supabase auth) exists; the prober/dashboard/notification backend described in the PRD has not been built yet.
+Upkeep — a self-hosted uptime/health monitor for personal projects on free-tier hosts. The product spec lives in `docs/PRD.md` — read it for feature scope and data model before building backend features; `docs/ROADMAP.md` breaks it into sequential phases/issues. Currently only the Next.js frontend (marketing site + Supabase auth) exists; the prober/dashboard/notification backend described in the PRD has not been built yet.
 
 ## Commands
 
@@ -33,7 +33,7 @@ No Supabase secrets are ever committed — `supabase login` stores its token in 
 Next.js 15 App Router project using a **feature-based `src/` layout**:
 
 - `src/app/` — routes only (pages, layouts, route handlers). Auth routes live under `src/app/auth/*`; a `src/app/dashboard/` route group requires an authenticated session.
-- `src/features/<feature>/` — self-contained feature modules (currently `auth`, `marketing`, `projects`, `dashboard`), each internally split into `components/`, `lib/`, `constants/`, `types/`. Every feature exposes a single `index.ts` barrel as its public API — import from `@/features/auth`, not from internal paths like `@/features/auth/components/login-form`. Follow this pattern for new features.
+- `src/features/<feature>/` — self-contained feature modules (currently `auth`, `marketing`, `projects`, `dashboard`, `notifications`, `api-keys`, `platform-accounts`, `docs`), each internally split into `components/`, `lib/`, `constants/`, `types/`. Every feature exposes a single `index.ts` barrel as its public API — import from `@/features/auth`, not from internal paths like `@/features/auth/components/login-form`. Follow this pattern for new features. `platform-accounts` owns Platform Usage Budgets (docs/ROADMAP.md Phase 12): a user-created "platform account" (a real hosting account on Vercel/Render/Railway/Appwrite/etc., or a custom one) pools a monthly compute-minute budget across the projects attached to it; `projects` depends on `platform-accounts` (never the reverse) to derive `check_interval_seconds`/`keep_alive_interval_minutes` from that budget when a project opts in — the prober itself is untouched, since it only ever reads those two columns.
 - `src/components/` — cross-feature UI: `components/ui/*` is shadcn/ui primitives (managed via `components.json`, style "new-york"), `components/layout/*` is app chrome (header/footer/theme switcher).
 - `src/lib/supabase/` — three separate Supabase client constructors, each for a different execution context: `client.ts` (browser), `server.ts` (Server Components/Actions, cookie-based), `proxy.ts` (middleware session refresh, used by `src/proxy.ts`). Don't reuse one across contexts — Supabase SSR requires the right client per context, and instances must not be cached in module-level globals (see comments in those files re: Fluid Compute).
 - `src/proxy.ts` is this project's Next.js middleware (exports `proxy`, not `middleware`, per the current Next.js convention) — it refreshes the Supabase session and redirects unauthenticated users to `/auth/login` for any route outside `/`, `/login`, `/auth`.

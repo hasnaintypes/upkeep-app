@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatDateTime, formatRelativeTime, isExternalUrl } from "@/lib/utils";
 import { checkTargetPrefix, type Project } from "@/features/projects";
+import type { PlatformAccountWithUsage } from "@/features/platform-accounts";
 import {
   DEGRADED_DAY_THRESHOLD,
   DOWN_DAY_THRESHOLD,
@@ -145,9 +146,14 @@ function formatKeepAliveWindow(project: Project): string | null {
 export function ProjectDetailHeader({
   project,
   summary,
+  platformAccount,
 }: {
   project: Project;
   summary: ProjectUptimeSummary | null;
+  /** The platform_accounts row project.platform_account_id points at (docs/ROADMAP.md Phase
+   * 12), fetched by the page-level loader -- null both when the project has no account
+   * attached and (defensively) if the referenced account couldn't be found. */
+  platformAccount?: PlatformAccountWithUsage | null;
 }) {
   const keepAliveWindow = formatKeepAliveWindow(project);
   const isRateLimited =
@@ -254,6 +260,18 @@ export function ProjectDetailHeader({
               )}
               <DetailRow label="Hosting provider" value={project.hosting_provider ?? "—"} />
               <DetailRow label="Collection" value={project.collection ?? "—"} />
+              {platformAccount && project.budget_minutes_per_month !== null && (
+                <DetailRow
+                  label="Hosting budget"
+                  value={
+                    <Link href="/dashboard/hosting-accounts" className="hover:underline">
+                      {project.budget_minutes_per_month} min/mo via {platformAccount.label}
+                      {platformAccount.quota_minutes_per_month !== null &&
+                        ` (${Math.round((platformAccount.allocated_minutes_per_month / platformAccount.quota_minutes_per_month) * 100)}% of its pool)`}
+                    </Link>
+                  }
+                />
+              )}
               <DetailRow
                 label="Keep-alive pings"
                 value={keepAliveWindow ?? "Off"}

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -163,6 +163,71 @@ export type Database = {
           },
         ]
       }
+      hosting_platform_tiers: {
+        Row: {
+          created_at: string
+          free_quota_minutes_per_month: number | null
+          id: string
+          name: string
+          notes: string | null
+          platform_id: string
+          slug: string
+          source_url: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          free_quota_minutes_per_month?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          platform_id: string
+          slug: string
+          source_url?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          free_quota_minutes_per_month?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          platform_id?: string
+          slug?: string
+          source_url?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hosting_platform_tiers_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "hosting_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hosting_platforms: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       incidents: {
         Row: {
           cause: string | null
@@ -224,6 +289,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      platform_accounts: {
+        Row: {
+          assumed_ms_per_request: number
+          created_at: string
+          id: string
+          label: string
+          platform_id: string
+          quota_minutes_per_month: number | null
+          tier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assumed_ms_per_request?: number
+          created_at?: string
+          id?: string
+          label: string
+          platform_id: string
+          quota_minutes_per_month?: number | null
+          tier_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          assumed_ms_per_request?: number
+          created_at?: string
+          id?: string
+          label?: string
+          platform_id?: string
+          quota_minutes_per_month?: number | null
+          tier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_accounts_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "hosting_platforms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_accounts_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "hosting_platform_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prober_health: {
         Row: {
@@ -306,6 +422,7 @@ export type Database = {
       projects: {
         Row: {
           body: string | null
+          budget_minutes_per_month: number | null
           check_interval_seconds: number
           check_type: string
           collection: string | null
@@ -321,7 +438,9 @@ export type Database = {
           id: string
           is_active: boolean
           is_public: boolean
+          keep_alive_budget_minutes_per_month: number | null
           keep_alive_enabled: boolean
+          keep_alive_interval_minutes: number
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
           keep_alive_window_start: string | null
@@ -329,6 +448,7 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          platform_account_id: string | null
           rate_limit_backoff_count: number
           rate_limit_backoff_until: string | null
           retry_count: number
@@ -339,6 +459,7 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          budget_minutes_per_month?: number | null
           check_interval_seconds?: number
           check_type?: string
           collection?: string | null
@@ -354,7 +475,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_public?: boolean
+          keep_alive_budget_minutes_per_month?: number | null
           keep_alive_enabled?: boolean
+          keep_alive_interval_minutes?: number
           keep_alive_timezone?: string | null
           keep_alive_window_end?: string | null
           keep_alive_window_start?: string | null
@@ -362,6 +485,7 @@ export type Database = {
           last_manual_check_at?: string | null
           method?: string
           name: string
+          platform_account_id?: string | null
           rate_limit_backoff_count?: number
           rate_limit_backoff_until?: string | null
           retry_count?: number
@@ -372,6 +496,7 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          budget_minutes_per_month?: number | null
           check_interval_seconds?: number
           check_type?: string
           collection?: string | null
@@ -387,7 +512,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_public?: boolean
+          keep_alive_budget_minutes_per_month?: number | null
           keep_alive_enabled?: boolean
+          keep_alive_interval_minutes?: number
           keep_alive_timezone?: string | null
           keep_alive_window_end?: string | null
           keep_alive_window_start?: string | null
@@ -395,6 +522,7 @@ export type Database = {
           last_manual_check_at?: string | null
           method?: string
           name?: string
+          platform_account_id?: string | null
           rate_limit_backoff_count?: number
           rate_limit_backoff_until?: string | null
           retry_count?: number
@@ -403,7 +531,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_platform_account_id_fkey"
+            columns: ["platform_account_id"]
+            isOneToOne: false
+            referencedRelation: "platform_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -421,6 +557,7 @@ export type Database = {
         Args: never
         Returns: {
           body: string | null
+          budget_minutes_per_month: number | null
           check_interval_seconds: number
           check_type: string
           collection: string | null
@@ -436,7 +573,9 @@ export type Database = {
           id: string
           is_active: boolean
           is_public: boolean
+          keep_alive_budget_minutes_per_month: number | null
           keep_alive_enabled: boolean
+          keep_alive_interval_minutes: number
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
           keep_alive_window_start: string | null
@@ -444,6 +583,7 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          platform_account_id: string | null
           rate_limit_backoff_count: number
           rate_limit_backoff_until: string | null
           retry_count: number
@@ -463,6 +603,7 @@ export type Database = {
         Args: never
         Returns: {
           body: string | null
+          budget_minutes_per_month: number | null
           check_interval_seconds: number
           check_type: string
           collection: string | null
@@ -478,7 +619,9 @@ export type Database = {
           id: string
           is_active: boolean
           is_public: boolean
+          keep_alive_budget_minutes_per_month: number | null
           keep_alive_enabled: boolean
+          keep_alive_interval_minutes: number
           keep_alive_timezone: string | null
           keep_alive_window_end: string | null
           keep_alive_window_start: string | null
@@ -486,6 +629,7 @@ export type Database = {
           last_manual_check_at: string | null
           method: string
           name: string
+          platform_account_id: string | null
           rate_limit_backoff_count: number
           rate_limit_backoff_until: string | null
           retry_count: number
@@ -622,12 +766,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -651,11 +795,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -676,11 +820,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -701,11 +845,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -718,11 +862,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

@@ -31,6 +31,16 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { notify } from "@/lib/toast";
+// Bypasses features/platform-accounts's own index.ts barrel -- that barrel also re-exports
+// lib/queries.ts, which depends on next/headers and can't be bundled into this Client
+// Component (same reasoning as nav-main.tsx's own doc comment on avoiding the projects
+// feature's barrel for the identical reason). Only the two files actually needed here.
+import { listPlatformAccountsForForm } from "@/features/platform-accounts/lib/actions";
+import {
+  intervalSecondsFromBudget,
+  keepAliveIntervalMinutesFromBudget,
+} from "@/features/platform-accounts/lib/platform-budget";
+import type { PlatformAccountWithUsage } from "@/features/platform-accounts/types";
 import { IANA_TIMEZONES } from "../constants";
 import { createProject, updateProject, updateProjectHeaders } from "../lib/actions";
 import {
@@ -50,7 +60,14 @@ import {
 
 type FormState = Omit<
   CreateProjectFormValues,
-  "tags" | "headers" | "keep_alive_window_start" | "keep_alive_window_end" | "keep_alive_timezone"
+  | "tags"
+  | "headers"
+  | "keep_alive_window_start"
+  | "keep_alive_window_end"
+  | "keep_alive_timezone"
+  | "platform_account_id"
+  | "budget_minutes_per_month"
+  | "keep_alive_budget_minutes_per_month"
 > & {
   tagsInput: string;
   // Kept as plain (possibly empty) strings here, not `string | null` like
@@ -60,7 +77,26 @@ type FormState = Omit<
   keep_alive_window_start: string;
   keep_alive_window_end: string;
   keep_alive_timezone: string;
+  // "" (NONE_SENTINEL) stands in for null -- Radix Select rejects an empty
+  // string item value, same reasoning as project-columns.tsx's own sentinel
+  // patterns elsewhere in this app. budget*Input stay plain strings (like
+  // tagsInput) so the number inputs can be legitimately empty while typing;
+  // "" means "no budget set" at submit time (lib/validation.ts's nullable
+  // budget_minutes_per_month/keep_alive_budget_minutes_per_month fields).
+  platformAccountId: string;
+  budgetMinutesInput: string;
+  keepAliveBudgetMinutesInput: string;
 };
+
+const NONE_PLATFORM_ACCOUNT = "none";
+
+/** Rough human-readable rendering of a derived interval, for the budget calculator's live
+ * preview -- not used anywhere values are actually persisted. */
+function formatInterval(seconds: number): string {
+  if (seconds < 120) return `${seconds}s`;
+  if (seconds < 7200) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds / 3600)}h`;
+}
 
 /** Postgres returns `time` columns as "HH:MM:SS" -- <input type="time">'s default (minute)
  * step only accepts "HH:MM", so the seconds are dropped here. */
@@ -76,6 +112,9 @@ function toFormState(project?: Project): FormState {
       keep_alive_window_start: "",
       keep_alive_window_end: "",
       keep_alive_timezone: "",
+      platformAccountId: NONE_PLATFORM_ACCOUNT,
+      budgetMinutesInput: "",
+      keepAliveBudgetMinutesInput: "",
     };
   }
   return {
@@ -96,6 +135,13 @@ function toFormState(project?: Project): FormState {
     keep_alive_window_end: toTimeInputValue(project.keep_alive_window_end),
     keep_alive_timezone: project.keep_alive_timezone ?? "",
     is_public: project.is_public,
+    platformAccountId: project.platform_account_id ?? NONE_PLATFORM_ACCOUNT,
+    budgetMinutesInput:
+      project.budget_minutes_per_month != null ? String(project.budget_minutes_per_month) : "",
+    keepAliveBudgetMinutesInput:
+      project.keep_alive_budget_minutes_per_month != null
+        ? String(project.keep_alive_budget_minutes_per_month)
+        : "",
   };
 }
 
@@ -215,10 +261,40 @@ export function AddProjectForm({
   // to instead (#54).
   const [origin, setOrigin] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [platformAccounts, setPlatformAccounts] = useState<PlatformAccountWithUsage[]>([]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  // Fetched via a "use server" action (not lib/queries.ts directly -- that
+  // depends on next/headers and can't be bundled into this Client
+  // Component), same reasoning as `AddProjectTrigger`'s own server-fetch
+  // split documented on nav-main.tsx. Small, rarely-changing list -- a
+  // once-on-mount fetch is enough, no need to thread it through every
+  // call site the way existingCollections is (see this feature's `index.ts`
+  // barrel vs. features/platform-accounts's).
+  useEffect(() => {
+    void listPlatformAccountsForForm().then(({ data }) => {
+      if (data) setPlatformAccounts(data);
+    });
+  }, []);
+
+  const selectedAccount = platformAccounts.find((a) => a.id === values.platformAccountId);
+  const budgetMinutes = Number(values.budgetMinutesInput);
+  const hasBudgetMinutes = values.budgetMinutesInput.trim() !== "" && budgetMinutes > 0;
+  const derivedCheckIntervalSeconds =
+    selectedAccount && hasBudgetMinutes
+      ? intervalSecondsFromBudget(budgetMinutes, selectedAccount.assumed_ms_per_request)
+      : null;
+
+  const keepAliveBudgetMinutes = Number(values.keepAliveBudgetMinutesInput);
+  const hasKeepAliveBudgetMinutes =
+    values.keepAliveBudgetMinutesInput.trim() !== "" && keepAliveBudgetMinutes > 0;
+  const derivedKeepAliveIntervalMinutes =
+    selectedAccount && hasKeepAliveBudgetMinutes
+      ? keepAliveIntervalMinutesFromBudget(keepAliveBudgetMinutes, selectedAccount.assumed_ms_per_request)
+      : null;
 
   // Only meaningful once the project actually exists (editing, not still
   // being created) and the browser origin has resolved -- see the `origin`
@@ -269,10 +345,22 @@ export function AddProjectForm({
               .map((row) => [row.key.trim(), row.value]),
           );
 
+    // null (not "", not omitted) is the explicit "no account"/"no budget"
+    // state the schema/server action expect -- see validation.ts's own
+    // comment on these three fields.
+    const platformAccountId =
+      values.platformAccountId === NONE_PLATFORM_ACCOUNT ? null : values.platformAccountId;
+    const budgetMinutesPerMonth = platformAccountId && hasBudgetMinutes ? budgetMinutes : null;
+    const keepAliveBudgetMinutesPerMonth =
+      platformAccountId && hasKeepAliveBudgetMinutes ? keepAliveBudgetMinutes : null;
+
     const result = createProjectSchema.safeParse({
       ...values,
       tags,
       headers: headersForCreate,
+      platform_account_id: platformAccountId,
+      budget_minutes_per_month: budgetMinutesPerMonth,
+      keep_alive_budget_minutes_per_month: keepAliveBudgetMinutesPerMonth,
     });
 
     if (!result.success) {
@@ -302,6 +390,9 @@ export function AddProjectForm({
           keep_alive_window_end,
           keep_alive_timezone,
           is_public,
+          platform_account_id,
+          budget_minutes_per_month,
+          keep_alive_budget_minutes_per_month,
         } = result.data;
 
         const mainResult = await updateProject(project.id, {
@@ -322,6 +413,9 @@ export function AddProjectForm({
           keep_alive_window_end,
           keep_alive_timezone,
           is_public,
+          platform_account_id,
+          budget_minutes_per_month,
+          keep_alive_budget_minutes_per_month,
         });
         if (mainResult.error || !mainResult.data) {
           const message = mainResult.error ?? "Something went wrong.";
@@ -523,15 +617,23 @@ export function AddProjectForm({
             <Input
               id="check_interval_seconds"
               type="number"
+              disabled={derivedCheckIntervalSeconds !== null}
               aria-invalid={!!fieldErrors.check_interval_seconds}
-              value={values.check_interval_seconds}
+              value={derivedCheckIntervalSeconds ?? values.check_interval_seconds}
               onChange={(e) =>
                 updateField("check_interval_seconds", Number(e.target.value))
               }
             />
-            <FieldError
-              errors={toFieldErrorMessages(fieldErrors.check_interval_seconds)}
-            />
+            {derivedCheckIntervalSeconds !== null ? (
+              <FieldDescription>
+                Derived from the monitoring budget set under More options -- change it there
+                instead of here.
+              </FieldDescription>
+            ) : (
+              <FieldError
+                errors={toFieldErrorMessages(fieldErrors.check_interval_seconds)}
+              />
+            )}
           </Field>
 
           <Field orientation="responsive" data-invalid={!!fieldErrors.timeout_ms}>
@@ -554,6 +656,87 @@ export function AddProjectForm({
             </AccordionTrigger>
             <AccordionContent>
               <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="platform_account">Hosting account</FieldLabel>
+                  <Select
+                    value={values.platformAccountId}
+                    onValueChange={(value) => updateField("platformAccountId", value)}
+                  >
+                    <SelectTrigger id="platform_account" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_PLATFORM_ACCOUNT}>
+                        None -- size the check interval manually
+                      </SelectItem>
+                      {platformAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.label} ({account.platform.name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    Attach this project to a real hosting account to derive its check interval
+                    from a monthly usage budget instead of guessing a number. Manage accounts
+                    under Hosting Accounts in the sidebar.
+                  </FieldDescription>
+                </Field>
+
+                {selectedAccount && (
+                  <div className="flex flex-col gap-4 rounded-md border p-3">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedAccount.quota_minutes_per_month === null
+                        ? `${selectedAccount.allocated_minutes_per_month} min/month allocated across this account's projects -- unlimited quota.`
+                        : `${selectedAccount.allocated_minutes_per_month} / ${selectedAccount.quota_minutes_per_month} min/month already allocated across this account's projects (including this one's previous value, if editing).`}
+                    </p>
+
+                    <Field orientation="responsive">
+                      <FieldLabel htmlFor="budget_minutes">
+                        Monitoring budget (min/month)
+                      </FieldLabel>
+                      <Input
+                        id="budget_minutes"
+                        type="number"
+                        min={1}
+                        placeholder="e.g. 20"
+                        value={values.budgetMinutesInput}
+                        onChange={(e) => updateField("budgetMinutesInput", e.target.value)}
+                      />
+                      {derivedCheckIntervalSeconds !== null && (
+                        <FieldDescription>
+                          ≈ every {formatInterval(derivedCheckIntervalSeconds)}, assuming{" "}
+                          {selectedAccount.assumed_ms_per_request}ms per check.
+                        </FieldDescription>
+                      )}
+                    </Field>
+
+                    {values.keep_alive_enabled && (
+                      <Field orientation="responsive">
+                        <FieldLabel htmlFor="keep_alive_budget_minutes">
+                          Keep-alive budget (min/month)
+                        </FieldLabel>
+                        <Input
+                          id="keep_alive_budget_minutes"
+                          type="number"
+                          min={1}
+                          placeholder="e.g. 10"
+                          value={values.keepAliveBudgetMinutesInput}
+                          onChange={(e) =>
+                            updateField("keepAliveBudgetMinutesInput", e.target.value)
+                          }
+                        />
+                        {derivedKeepAliveIntervalMinutes !== null && (
+                          <FieldDescription>
+                            ≈ every {derivedKeepAliveIntervalMinutes}m (defaults to every 10m if
+                            left blank).
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    )}
+                  </div>
+                )}
+
                 <Field orientation="responsive">
                   <FieldLabel htmlFor="hosting_provider">
                     Hosting provider
@@ -561,11 +744,15 @@ export function AddProjectForm({
                   <Input
                     id="hosting_provider"
                     placeholder="Render, Railway, Vercel..."
-                    value={values.hosting_provider}
+                    disabled={!!selectedAccount}
+                    value={selectedAccount ? selectedAccount.platform.name : values.hosting_provider}
                     onChange={(e) =>
                       updateField("hosting_provider", e.target.value)
                     }
                   />
+                  {selectedAccount && (
+                    <FieldDescription>Set from the attached platform account.</FieldDescription>
+                  )}
                 </Field>
 
                 <Field

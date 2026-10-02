@@ -7,6 +7,7 @@ import { ChartCardSkeleton } from "@/components/ui/loading-skeletons";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProjectById } from "@/features/projects";
+import { getPlatformAccountsWithUsage } from "@/features/platform-accounts";
 import {
   CheckLogTable,
   getProjectChecksPage,
@@ -35,7 +36,8 @@ import type {
  * (#32) -- matching the PRD's own ordering for this page. Per-project
  * notification rule configuration (`ProjectNotificationRules`) deliberately
  * doesn't live here -- removed from this page's UI; channel management
- * itself is on /dashboard/settings.
+ * itself is in the Notifications section of the settings dialog
+ * (components/layout/settings-dialog.tsx).
  */
 async function ProjectDetailLoader({
   params,
@@ -83,6 +85,15 @@ async function ProjectDetailLoader({
 
   const summary = summaries?.find((s) => s.project_id === project.id) ?? null;
 
+  // Only fetched when actually needed -- most projects have no platform account attached, and
+  // this is the user's own (typically short) account list, so refetching per project detail
+  // view is cheap and avoids a join inside getProjectById for the common case that doesn't
+  // need it.
+  const platformAccount = project.platform_account_id
+    ? (await getPlatformAccountsWithUsage()).data?.find((a) => a.id === project.platform_account_id) ??
+      null
+    : null;
+
   const [
     seriesEntries,
     { data: dailyHistory, error: historyError },
@@ -106,7 +117,7 @@ async function ProjectDetailLoader({
 
   return (
     <div className="flex flex-col gap-8">
-      <ProjectDetailHeader project={project} summary={summary} />
+      <ProjectDetailHeader project={project} summary={summary} platformAccount={platformAccount} />
 
       <div className="flex flex-col gap-4">
         <SectionLabel>Monitoring</SectionLabel>
