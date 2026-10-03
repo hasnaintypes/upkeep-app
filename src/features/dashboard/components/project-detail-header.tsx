@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatDateTime, formatRelativeTime, isExternalUrl } from "@/lib/utils";
 import { checkTargetPrefix, type Project } from "@/features/projects";
 import type { PlatformAccountWithUsage } from "@/features/platform-accounts";
+import { HostingBudgetLink } from "./hosting-budget-link";
 import {
   DEGRADED_DAY_THRESHOLD,
   DOWN_DAY_THRESHOLD,
@@ -264,11 +265,11 @@ export function ProjectDetailHeader({
                 <DetailRow
                   label="Hosting budget"
                   value={
-                    <Link href="/dashboard/hosting-accounts" className="hover:underline">
+                    <HostingBudgetLink>
                       {project.budget_minutes_per_month} min/mo via {platformAccount.label}
                       {platformAccount.quota_minutes_per_month !== null &&
                         ` (${Math.round((platformAccount.allocated_minutes_per_month / platformAccount.quota_minutes_per_month) * 100)}% of its pool)`}
-                    </Link>
+                    </HostingBudgetLink>
                   }
                 />
               )}

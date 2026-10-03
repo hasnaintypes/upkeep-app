@@ -81,3 +81,22 @@ export async function signOut(): Promise<AuthActionResult> {
   const { error } = await supabase.auth.signOut();
   return { error };
 }
+
+/**
+ * Updates display-only profile fields (full name, username, avatar URL) -- stored in Supabase
+ * Auth's `user_metadata`, not a `profiles` table (none exists; see theme-toggle.tsx's own doc
+ * comment for the same "no profiles table" precedent). Unlike `updateEmail`/`updatePassword`,
+ * no re-authentication or confirmation step: `user_metadata` isn't a security-sensitive field,
+ * and Supabase applies it to the current session immediately. Never read `user_metadata` for
+ * authorization decisions elsewhere in this app -- it's caller-editable by design (this
+ * function), so it's display-only data, not a trust boundary.
+ */
+export async function updateProfile(data: {
+  full_name?: string;
+  username?: string;
+  avatar_url?: string;
+}): Promise<AuthActionResult> {
+  const supabase = createClient();
+  const { error } = await supabase.auth.updateUser({ data });
+  return { error };
+}

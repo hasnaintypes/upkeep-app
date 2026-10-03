@@ -1,19 +1,37 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { BellIcon, SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
+import { BellIcon, ServerIcon, SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-// Bypasses the "@/features/notifications" barrel -- it also re-exports lib/queries.ts, which
-// depends on next/headers and can't be bundled into this Client Component (same reasoning as
-// add-project-form.tsx's own bypass of the platform-accounts barrel).
+// Bypasses the "@/features/notifications" and "@/features/platform-accounts" barrels -- both
+// also re-export a lib/queries.ts, which depends on next/headers and can't be bundled into this
+// Client Component (same reasoning as add-project-form.tsx's own barrel bypasses).
 import { ChannelList } from "@/features/notifications/components/channel-list";
 import type { NotificationChannel } from "@/features/notifications/types";
-import { ChangeEmailForm, ChangePasswordForm, DeleteAccountSection } from "@/features/account";
+import { PlatformAccountList } from "@/features/platform-accounts/components/platform-account-list";
+import type {
+  HostingPlatformWithTiers,
+  PlatformAccountWithUsage,
+} from "@/features/platform-accounts/types";
+import {
+  AvatarUpload,
+  ChangeEmailForm,
+  ChangePasswordForm,
+  DeleteAccountSection,
+  ProfileForm,
+} from "@/features/account";
 // Direct file import, not a barrel -- the dashboard feature owns this one "use server" action
 // (it's the natural home for "what does the dashboard-wide settings UI need"), but this
 // component itself lives outside any single feature (see this file's own doc comment), so it
@@ -21,13 +39,14 @@ import { ChangeEmailForm, ChangePasswordForm, DeleteAccountSection } from "@/fea
 // project-notification-rules.tsx importing *this* file already requires avoiding.
 import { getSettingsDialogData } from "@/features/dashboard/lib/actions";
 
-type SettingsSection = "general" | "account" | "security" | "notifications";
+type SettingsSection = "general" | "account" | "security" | "notifications" | "hosting";
 
 const NAV_ITEMS: { value: SettingsSection; label: string; icon: typeof SettingsIcon }[] = [
   { value: "general", label: "General", icon: SettingsIcon },
   { value: "account", label: "Account", icon: UserIcon },
   { value: "security", label: "Security", icon: ShieldIcon },
   { value: "notifications", label: "Notifications", icon: BellIcon },
+  { value: "hosting", label: "Hosting Accounts", icon: ServerIcon },
 ];
 
 /** Opens the settings dialog, optionally jumping straight to one section -- e.g. the
@@ -47,8 +66,8 @@ export function useSettingsDialog(): OpenSettingsDialog {
   return openSettings;
 }
 
-function initialFor(email: string) {
-  return email.charAt(0).toUpperCase();
+function initialFor(label: string) {
+  return label.charAt(0).toUpperCase();
 }
 
 /** Section heading matching the reference design's "Appearance" / "Voice" / "Notifications"
@@ -95,20 +114,42 @@ function GeneralSection() {
   );
 }
 
-function AccountSection({ email }: { email: string }) {
+function AccountSection({
+  userId,
+  email,
+  fullName,
+  username,
+  avatarUrl,
+  onAvatarUploaded,
+  onProfileSaved,
+}: {
+  userId: string;
+  email: string;
+  fullName: string;
+  username: string;
+  avatarUrl: string | null;
+  onAvatarUploaded: (url: string) => void;
+  onProfileSaved: (data: { fullName: string; username: string }) => void;
+}) {
   return (
     <div className="flex flex-col gap-8">
       <div>
         <SectionHeading>Profile</SectionHeading>
         <div className="divide-y">
-          <SettingsRow label="Signed in as">
-            <div className="flex items-center gap-3">
-              <Avatar className="size-9">
-                <AvatarFallback>{initialFor(email)}</AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium">{email}</span>
-            </div>
+          <SettingsRow label="Profile photo" description="PNG, JPEG, or WebP, up to 10MB.">
+            <AvatarUpload
+              userId={userId}
+              avatarUrl={avatarUrl}
+              fallback={initialFor(username || fullName || email)}
+              onUploaded={onAvatarUploaded}
+            />
           </SettingsRow>
+          <SettingsRow label="Signed in as">
+            <span className="text-sm font-medium">{email}</span>
+          </SettingsRow>
+        </div>
+        <div className="pt-4">
+          <ProfileForm fullName={fullName} username={username} onSaved={onProfileSaved} />
         </div>
       </div>
 
@@ -128,14 +169,40 @@ function SecuritySection({ email }: { email: string }) {
       <div>
         <SectionHeading>Login</SectionHeading>
         <div className="divide-y">
-          <div className="py-4">
-            <p className="mb-3 text-sm font-medium">Change email</p>
-            <ChangeEmailForm currentEmail={email} />
-          </div>
-          <div className="py-4">
-            <p className="mb-3 text-sm font-medium">Change password</p>
-            <ChangePasswordForm email={email} />
-          </div>
+          <SettingsRow label="Email" description={`Currently ${email}.`}>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Change email
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Change email</DialogTitle>
+                  <DialogDescription>
+                    Update the address used to sign in and receive account notices.
+                  </DialogDescription>
+                </DialogHeader>
+                <ChangeEmailForm currentEmail={email} />
+              </DialogContent>
+            </Dialog>
+          </SettingsRow>
+          <SettingsRow label="Password" description="Update the password used to sign in.">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Change password
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Change password</DialogTitle>
+                  <DialogDescription>Update the password used to sign in.</DialogDescription>
+                </DialogHeader>
+                <ChangePasswordForm email={email} />
+              </DialogContent>
+            </Dialog>
+          </SettingsRow>
         </div>
       </div>
     </div>
@@ -151,6 +218,27 @@ function NotificationsSection({ initialChannels }: { initialChannels: Notificati
           Discord webhooks, email addresses, and generic webhooks you can attach to projects.
         </p>
         <ChannelList initialChannels={initialChannels} />
+      </div>
+    </div>
+  );
+}
+
+function HostingAccountsSection({
+  initialAccounts,
+  platforms,
+}: {
+  initialAccounts: PlatformAccountWithUsage[];
+  platforms: HostingPlatformWithTiers[];
+}) {
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <SectionHeading>Hosting Accounts</SectionHeading>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">
+          Group projects by the real hosting account they run on, and see how much of its
+          monthly free-tier usage is already allocated.
+        </p>
+        <PlatformAccountList initialAccounts={initialAccounts} platforms={platforms} />
       </div>
     </div>
   );
@@ -184,32 +272,53 @@ function SettingsContentSkeleton() {
  * (which already imports from `notifications` for the dialog's own content), `notifications`
  * importing it back would be a circular feature dependency.
  *
- * Needs no props at all: email + notification channels are fetched lazily, on first open, via
- * `getSettingsDialogData()` (features/dashboard/lib/actions.ts) -- a "use server" action, not a
- * `dashboard/layout.tsx` server-fetch-and-pass-down the way `NavUser`'s own `email` prop works,
- * so this provider wrapping the *entire* dashboard layout doesn't force every single page load
- * to pay for a notification-channels query most visits never need, and doesn't need a blocking
- * `<Suspense>` around the whole layout shell just to supply two props.
+ * Needs no props at all: identity/profile fields, notification channels, and hosting accounts
+ * are fetched lazily, on first open, via `getSettingsDialogData()`
+ * (features/dashboard/lib/actions.ts) -- a "use server" action, not a `dashboard/layout.tsx`
+ * server-fetch-and-pass-down the way `NavUser`'s own `email` prop works, so this provider
+ * wrapping the *entire* dashboard layout doesn't force every single page load to pay for those
+ * queries for visits that never open settings, and doesn't need a blocking `<Suspense>` around
+ * the whole layout shell just to supply props.
  */
+type DialogData = {
+  userId: string;
+  email: string;
+  fullName: string;
+  username: string;
+  avatarUrl: string | null;
+  channels: NotificationChannel[];
+  platformAccounts: PlatformAccountWithUsage[];
+  hostingPlatforms: HostingPlatformWithTiers[];
+};
+
 export function SettingsDialogProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<SettingsSection>("general");
-  const [data, setData] = useState<{ email: string; channels: NotificationChannel[] } | null>(null);
+  const [data, setData] = useState<DialogData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const openSettings: OpenSettingsDialog = (target = "general") => {
     setSection(target);
     setOpen(true);
-    // Refetches on every open, not just the first -- a channel created/edited inside the
-    // dialog only updates ChannelList's own local state, never this provider's `data`, so a
-    // cached-after-first-load value would show a stale channel list on the next open. `data`
-    // is left in place (not cleared) while this runs, so a second-or-later open shows the
-    // previous content instantly and swaps in the fresh result once it resolves, rather than
-    // flashing the skeleton again every time -- only ever shown on the very first open.
+    // Refetches on every open, not just the first -- a channel/profile/hosting-account change
+    // made inside the dialog only updates that section's own local state, never this provider's
+    // `data`, so a cached-after-first-load value would show stale content on the next open.
+    // `data` is left in place (not cleared) while this runs, so a second-or-later open shows
+    // the previous content instantly and swaps in the fresh result once it resolves, rather
+    // than flashing the skeleton again every time -- only ever shown on the very first open.
     setIsLoading(true);
     void getSettingsDialogData().then((result) => {
-      if (result.email) {
-        setData({ email: result.email, channels: result.channels });
+      if (result.email && result.userId) {
+        setData({
+          userId: result.userId,
+          email: result.email,
+          fullName: result.fullName,
+          username: result.username,
+          avatarUrl: result.avatarUrl,
+          channels: result.channels,
+          platformAccounts: result.platformAccounts,
+          hostingPlatforms: result.hostingPlatforms,
+        });
       }
       setIsLoading(false);
     });
@@ -250,10 +359,30 @@ export function SettingsDialogProvider({ children }: { children: ReactNode }) {
               ) : (
                 <>
                   {section === "general" && <GeneralSection />}
-                  {section === "account" && <AccountSection email={data.email} />}
+                  {section === "account" && (
+                    <AccountSection
+                      userId={data.userId}
+                      email={data.email}
+                      fullName={data.fullName}
+                      username={data.username}
+                      avatarUrl={data.avatarUrl}
+                      onAvatarUploaded={(url) =>
+                        setData((prev) => (prev ? { ...prev, avatarUrl: url } : prev))
+                      }
+                      onProfileSaved={({ fullName, username }) =>
+                        setData((prev) => (prev ? { ...prev, fullName, username } : prev))
+                      }
+                    />
+                  )}
                   {section === "security" && <SecuritySection email={data.email} />}
                   {section === "notifications" && (
                     <NotificationsSection initialChannels={data.channels} />
+                  )}
+                  {section === "hosting" && (
+                    <HostingAccountsSection
+                      initialAccounts={data.platformAccounts}
+                      platforms={data.hostingPlatforms}
+                    />
                   )}
                 </>
               )}

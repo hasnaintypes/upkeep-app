@@ -14,14 +14,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { InlineEmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
 import { notify } from "@/lib/toast";
 import { deletePlatformAccount } from "../lib/actions";
@@ -30,13 +30,13 @@ import type { HostingPlatformWithTiers, PlatformAccount, PlatformAccountWithUsag
 
 /**
  * Hosting account management (docs/ROADMAP.md Phase 12): create/edit/delete the real hosting
- * accounts a project's usage budget can be pooled against. Rendered on
- * /dashboard/hosting-accounts (user-facing name -- the underlying feature/table names stay
- * "platform account[s]", see this feature's own index.ts). Owns state/mutations and delegates
- * create/edit to
- * `PlatformAccountForm` inside a `Dialog` -- same parent-owns-mutations split as
- * `ApiKeyList`/`ChannelList`; the delete `AlertDialog` mirrors those same two features'
- * confirmation flow.
+ * accounts a project's usage budget can be pooled against. Rendered in the Hosting Accounts
+ * section of the settings dialog (components/layout/settings-dialog.tsx) -- the underlying
+ * feature/table names stay "platform account[s]", see this feature's own index.ts for why.
+ * Owns state/mutations and delegates create/edit to `PlatformAccountForm` inside a `Sheet`
+ * (same side-panel convention as `AddProjectSheet`, nested inside the settings `Dialog` --
+ * Radix supports this) -- same parent-owns-mutations split as `ApiKeyList`/`ChannelList`; the
+ * delete `AlertDialog` mirrors those same two features' confirmation flow.
  */
 export function PlatformAccountList({
   initialAccounts,
@@ -106,8 +106,14 @@ export function PlatformAccountList({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {accounts.length === 0
+            ? "No accounts yet"
+            : `${accounts.length} account${accounts.length === 1 ? "" : "s"}`}
+        </p>
         <Button
+          size="sm"
           onClick={() => {
             setEditingAccount(null);
             setFormOpen(true);
@@ -118,18 +124,27 @@ export function PlatformAccountList({
       </div>
 
       {accounts.length === 0 ? (
-        <EmptyState
+        <InlineEmptyState
           icon={ServerIcon}
           title="No hosting accounts yet"
           description="Add one to let Upkeep derive a project's check interval from a monthly usage budget instead of guessing a number."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="divide-y">
           {accounts.map((account) => (
-            <Card key={account.id}>
-              <CardHeader>
-                <CardTitle>{account.label}</CardTitle>
-                <CardAction className="flex gap-2">
+            <div key={account.id} className="flex flex-col gap-3 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{account.label}</p>
+                    <Badge variant="secondary">{account.platform.name}</Badge>
+                    <Badge variant="outline">{account.tier.name}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {account.project_count} project{account.project_count === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -150,68 +165,66 @@ export function PlatformAccountList({
                   >
                     Delete
                   </Button>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{account.platform.name}</Badge>
-                  <Badge variant="outline">{account.tier.name}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {account.project_count} project{account.project_count === 1 ? "" : "s"}
-                  </span>
                 </div>
+              </div>
 
-                {account.quota_minutes_per_month === null ? (
+              {account.quota_minutes_per_month === null ? (
+                <p className="text-sm text-muted-foreground">
+                  {account.allocated_minutes_per_month} min/month allocated · unlimited quota
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <Progress
+                    value={Math.min(
+                      100,
+                      (account.allocated_minutes_per_month / Math.max(account.quota_minutes_per_month, 1)) * 100,
+                    )}
+                    className={
+                      (account.remaining_minutes_per_month ?? 0) < 0
+                        ? "[&_[data-slot=progress-indicator]]:bg-destructive"
+                        : undefined
+                    }
+                  />
                   <p className="text-sm text-muted-foreground">
-                    {account.allocated_minutes_per_month} min/month allocated · unlimited quota
+                    {account.allocated_minutes_per_month} / {account.quota_minutes_per_month} min/month
+                    allocated
+                    {(account.remaining_minutes_per_month ?? 0) < 0 && (
+                      <span className="text-destructive"> -- over budget (estimate)</span>
+                    )}
                   </p>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    <Progress
-                      value={Math.min(
-                        100,
-                        (account.allocated_minutes_per_month / Math.max(account.quota_minutes_per_month, 1)) * 100,
-                      )}
-                      className={
-                        (account.remaining_minutes_per_month ?? 0) < 0
-                          ? "[&_[data-slot=progress-indicator]]:bg-destructive"
-                          : undefined
-                      }
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {account.allocated_minutes_per_month} / {account.quota_minutes_per_month} min/month
-                      allocated
-                      {(account.remaining_minutes_per_month ?? 0) < 0 && (
-                        <span className="text-destructive"> -- over budget (estimate)</span>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
 
-      <Dialog
+      <Sheet
         open={formOpen}
         onOpenChange={(open) => {
           setFormOpen(open);
           if (!open) setEditingAccount(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingAccount ? "Edit hosting account" : "New hosting account"}</DialogTitle>
-          </DialogHeader>
-          <PlatformAccountForm
-            platforms={platforms}
-            account={editingAccount ?? undefined}
-            onSuccess={handleSaved}
-            onCancel={() => setFormOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+        <SheetContent className="w-full gap-0 p-0 sm:max-w-xl">
+          <SheetHeader className="gap-1 border-b px-6 py-5">
+            <SheetTitle>{editingAccount ? "Edit hosting account" : "New hosting account"}</SheetTitle>
+            <SheetDescription>
+              {editingAccount
+                ? `Update ${editingAccount.label}'s platform, tier, and budget defaults.`
+                : "Pick a platform and tier to pre-fill its known free quota, or enter your own."}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-6">
+            <PlatformAccountForm
+              platforms={platforms}
+              account={editingAccount ?? undefined}
+              onSuccess={handleSaved}
+              onCancel={() => setFormOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!deletingAccount} onOpenChange={(open) => !open && setDeletingAccount(null)}>
         <AlertDialogContent>

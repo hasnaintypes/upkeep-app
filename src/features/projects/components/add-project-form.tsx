@@ -679,7 +679,7 @@ export function AddProjectForm({
                   <FieldDescription>
                     Attach this project to a real hosting account to derive its check interval
                     from a monthly usage budget instead of guessing a number. Manage accounts
-                    under Hosting Accounts in the sidebar.
+                    under Hosting Accounts in Settings.
                   </FieldDescription>
                 </Field>
 

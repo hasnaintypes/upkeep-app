@@ -28,8 +28,9 @@ import { deleteAccount } from "../lib/actions";
  * that one call), so this needs more friction than the plain confirm dialog used for project
  * deletion (features/projects/components/project-list.tsx): the confirm button stays disabled
  * until the typed value exactly matches the account's own email. A flat label-left/action-right
- * row with a top border (not its own boxed `Card`) -- matches every other row in the dialog's
- * Account section, see settings-dialog.tsx's `AccountSection`.
+ * row (not its own boxed `Card`) -- matches every other row in the dialog's Account section
+ * (`SettingsRow` in settings-dialog.tsx), no divider of its own since it's the only row under
+ * its "Danger zone" heading.
  */
 export function DeleteAccountSection({ email }: { email: string }) {
   const [open, setOpen] = useState(false);
@@ -69,7 +70,7 @@ export function DeleteAccountSection({ email }: { email: string }) {
   const canConfirm = confirmValue === email;
 
   return (
-    <div className="flex items-center justify-between gap-4 border-t py-4">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div>
         <p className="text-sm font-medium">Delete your account</p>
         <p className="text-sm text-muted-foreground">
